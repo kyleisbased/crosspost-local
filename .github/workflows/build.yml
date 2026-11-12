@@ -1,0 +1,49 @@
+name: Build desktop test packages
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install chromium
+      - name: Install test-only media generator (Mac)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+      - name: Install test-only media generator (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg --no-progress -y
+      - run: npm test
+      - run: npm run test:ui
+      - name: Build native package
+        shell: bash
+        run: CROSSPOST_NODE_LICENSE="$GITHUB_WORKSPACE/runtime-notices/NODE-LICENSE.rtf" npm run package:portable
+      - name: Archive Mac app with permissions
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          for folder in releases/Crosspost-*; do
+            ditto -c -k --sequesterRsrc --keepParent "$folder" "$folder.zip"
+          done
+      - name: Archive Windows app
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Get-ChildItem releases -Directory | ForEach-Object { Compress-Archive -Path $_.FullName -DestinationPath ($_.FullName + '.zip') }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Crosspost-${{ matrix.os }}-TEST-BUILD
+          path: releases/*.zip
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0

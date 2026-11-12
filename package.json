@@ -1,0 +1,17 @@
+{
+  "name": "crosspost-local",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:ui": "node scripts/test-ui.mjs",
+    "setup": "playwright install chromium",
+    "package:portable": "node scripts/package-portable.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}

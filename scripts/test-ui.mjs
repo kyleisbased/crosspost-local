@@ -1,0 +1,74 @@
+// Exercises the real UI against an isolated database. External requests are blocked.
+// Account records are test fixtures; this is not a social-platform upload test.
+import assert from 'node:assert/strict';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {chromium} from 'playwright';
+import {createApp} from '../src/server.mjs';
+const root=await mkdtemp(path.join(tmpdir(),'crosspost-ui-'));
+let app,browser;
+try{
+  const sample=path.join(root,'sample.mp4');
+  await promisify(execFile)('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=green:s=180x320:d=1','-c:v','libx264','-pix_fmt','yuv420p',sample],{windowsHide:true});
+  app=await createApp({port:0,dataDir:path.join(root,'data'),worker:false});
+  browser=await chromium.launch({headless:true,channel:'chromium'});
+  const page=await browser.newPage({viewport:{width:1280,height:900}});
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());
+  await page.goto(`http://127.0.0.1:${app.port}`);
+  await page.getByText('No videos yet.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Add profile',exact:true}).click();
+  await page.getByRole('textbox',{name:/Name this profile/}).fill('UI test profile');
+  await page.getByRole('button',{name:'Save',exact:true}).click();
+  await page.getByRole('heading',{name:'Your accounts'}).waitFor();
+  assert.equal(app.store.snapshot().profiles.length,2);
+  await page.getByRole('button',{name:'Videos',exact:true}).click();
+  const buffer=await readFile(sample);
+  await page.locator('#files').setInputFiles(Array.from({length:10},(_,i)=>({name:`Short ${i+1}.mp4`,mimeType:'video/mp4',buffer})));
+  await page.getByRole('button',{name:'Continue (10)',exact:true}).waitFor({timeout:30000});
+  assert.equal(await page.locator('.video-card').count(),10);
+  await page.getByRole('button',{name:'Edit',exact:true}).first().click();
+  const title='A very long video title to check wrapping in the narrow mobile layout without breaking the page';
+  await page.locator('#editTitle').fill(title);
+  await page.locator('#editDescription').fill('Original description');
+  await page.getByRole('button',{name:'Save changes',exact:true}).click();
+  await page.getByRole('heading',{name:title}).waitFor();
+  await page.getByRole('button',{name:'Edit captions',exact:true}).click();
+  await page.getByRole('textbox',{name:/Apply this description/}).fill('Shared caption');
+  await page.getByRole('button',{name:'Save',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#toast').textContent==='Descriptions updated.');
+  assert.ok(app.store.snapshot().videos.every(v=>v.description==='Shared caption'));
+  await page.getByRole('button',{name:'Continue (10)',exact:true}).click();
+  assert.equal(await page.locator('#scheduleForm button[type=submit]').isDisabled(),true);
+  await page.locator('#scheduleDialog').getByRole('button',{name:'Close',exact:true}).click();
+  // No worker is running: fixture accounts only exercise local queue creation.
+  app.store.db.prepare('UPDATE accounts SET confirmed=1, label=?').run('LOCAL TEST FIXTURE');
+  await page.reload();
+  await page.locator('#selectAll').check();
+  await page.getByRole('button',{name:'Continue (10)',exact:true}).click();
+  await page.locator('#when').selectOption('later');
+  const future=new Date(Date.now()+86400000);future.setMinutes(future.getMinutes()-future.getTimezoneOffset());
+  await page.locator('#date').fill(future.toISOString().slice(0,16));
+  await page.locator('#audienceConfirmed').check();
+  await page.locator('#scheduleForm').getByRole('button',{name:'Confirm',exact:true}).click();
+  await page.getByRole('heading',{name:'Your queue'}).waitFor();
+  assert.equal(app.store.snapshot().jobs.length,30);
+  await page.getByRole('button',{name:'Cancel',exact:true}).first().click();
+  await page.locator('#jobs .status.cancelled').waitFor();
+  await page.getByRole('button',{name:'Pause queue',exact:true}).click();
+  await page.getByRole('button',{name:'Resume queue',exact:true}).waitFor();
+  assert.equal(app.store.paused(),true);
+  await page.getByRole('button',{name:'Videos',exact:true}).click();
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'Mobile page must not scroll horizontally');
+  await page.locator('#profile').selectOption({label:'My first profile'});
+  await page.getByText('No videos yet.',{exact:true}).waitFor();
+  assert.equal(await page.locator('.video-card').count(),0);
+  assert.deepEqual(errors,[]);
+  console.log('PASS: 10-video import, editing, bulk captions, account guard, 30 scheduled destinations, cancel, pause, profile isolation and 390px layout. No external posting attempted.');
+}finally{
+  await browser?.close();await app?.close();await rm(root,{recursive:true,force:true});
+}
