@@ -1,0 +1,12 @@
+name: Check Google desktop client
+on:
+  workflow_dispatch:
+permissions: {}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect rejection for a deliberately invalid code (no user data)
+        shell: bash
+        run: |
+          curl --silent --show-error --max-time 30 https://oauth2.googleapis.com/token --data-urlencode 'client_id=339324138959-4aa8v02qckvq3tc7kcrvitb968j64rdu.apps.googleusercontent.com' --data-urlencode 'code=crosspost-diagnostic-invalid-code' --data-urlencode 'code_verifier=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' --data-urlencode 'redirect_uri=http://127.0.0.1:4318/oauth/youtube/callback' --data-urlencode 'grant_type=authorization_code'
