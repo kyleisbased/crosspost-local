@@ -4,12 +4,10 @@ import {createReadStream} from 'node:fs';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import path from 'node:path';
-import {desktopClient} from './desktop-client.mjs';
 
 const scopes=['https://www.googleapis.com/auth/youtube.upload','https://www.googleapis.com/auth/youtube.readonly'];
-// Google requires the registered installed-app credential for this client.
-// It cannot be kept confidential in a desktop app; PKCE protects the exchange.
-export const desktopClientId=desktopClient.client_id;
+// The distributed credential correction is pending explicit publication approval.
+export const desktopClientId='339324138959-4aa8v02qckvq3tc7kcrvitb968j64rdu.apps.googleusercontent.com';
 export async function openGoogle(url){
   const parsed=new URL(url);
   if(parsed.origin!=='https://accounts.google.com')throw Error('Invalid Google sign-in URL.');
@@ -28,12 +26,7 @@ export class YouTube {
   constructor(dataDir,{fetcher=fetch,openBrowser=openGoogle,now=Date.now}={}){
     this.root=path.join(dataDir,'youtube');this.fetch=fetcher;this.openBrowser=openBrowser;this.now=now;this.pending=new Map();this.generations=new Map();this.config=null;
   }
-  async init(){
-    this.config=await read(path.join(this.root,'client.json'))||{...desktopClient};
-    // Repair old ID-only copies of our client without overriding custom projects.
-    if(this.config.client_id===desktopClientId&&!this.config.client_secret)this.config={...desktopClient,...this.config,client_secret:desktopClient.client_secret};
-    return this;
-  }
+  async init(){this.config=await read(path.join(this.root,'client.json'))||{client_id:desktopClientId};return this;}
   file(profile){if(!/^[a-zA-Z0-9_-]+$/.test(profile))throw Error('Invalid profile.');return path.join(this.root,profile+'.json');}
   async hasToken(profile){const value=await read(this.file(profile));return !!(this.config&&value?.client_id===this.config.client_id&&value.refresh_token);}
   async configure(input){
@@ -41,7 +34,6 @@ export class YouTube {
     if(!c||typeof c.client_id!=='string'||!/^[-a-zA-Z0-9_.]+\.apps\.googleusercontent\.com$/.test(c.client_id)||c.client_id.length>300)throw Error('Choose the Desktop app OAuth JSON downloaded from Google Cloud. Web app credentials will not work.');
     if(c.client_secret!==undefined&&(typeof c.client_secret!=='string'||c.client_secret.length>300))throw Error('Invalid desktop client settings.');
     this.config={client_id:c.client_id,client_secret:c.client_secret||''};this.pending.clear();this.generations.clear();
-    if(this.config.client_id===desktopClientId&&!this.config.client_secret)this.config.client_secret=desktopClient.client_secret;
     await save(path.join(this.root,'client.json'),this.config);
   }
   async connect(profile,origin){
