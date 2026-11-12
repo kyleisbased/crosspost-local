@@ -8,11 +8,15 @@ Crosspost 0.2.1 includes the public ID of the Crosspost Local Desktop OAuth clie
 
 No developer JSON is needed with the included client. No client secret or personal tokens are included in releases. The app uses PKCE and a loopback callback; Google's Desktop OAuth documentation lists the client secret as optional for code exchange and refresh.
 
-## Before friends can sign in
+## Current Google access
 
-The app owner must finish enabling YouTube Data API v3 in the Crosspost Local Google Cloud project and add each friend's Google email under Google Auth Platform > Audience > Test users. The project currently uses External / Testing. The Google API User Data Policy has been accepted and the desktop client and two requested scopes have been created. API activation and real-account verification are still pending.
+As of November 12, 2026, the shared Crosspost Local project is External / In production, without Google verification. YouTube Data API v3 is enabled. Individual tester invitations are no longer required. The Google API User Data Policy and YouTube API terms have been accepted.
 
-Testing access may require reauthorization. Google controls consent, token expiry and quotas. Wider distribution can require Google verification. No paid publishing service or AI credits are involved. Do not enable billing just to follow this guide.
+Google's unverified-app warning is expected. The project is limited to 100 users over its lifetime; publishing does not remove that cap or override Google account and organization restrictions. This publishing change applies to the included client in version 0.2.1 without another app download. Older packaged help may still refer to tester invitations; this page supersedes that guidance for the shared client.
+
+The maintainer intends this unverified release for a small personally known group. A successful real-account sign-in and upload are still required before calling the integration verified. The managed development session previously denied access to Google's token endpoint, so its simulated tests do not prove a real connection.
+
+Google controls consent, token expiry and quotas. No paid publishing service or AI credits are involved. Read the [privacy policy](PRIVACY.md) before connecting. Only authorize an app and permissions you recognize and trust.
 
 ## Optional: your own Google project
 
@@ -24,7 +28,7 @@ Keep imported settings private. Never share youtube/<profile>.json token files o
 
 Use a short video you have permission to publish. Review the selected account, title, description and audience setting, then publish one video to YouTube. The current Publish action requests **public** visibility. Verify the channel, visibility, audio and video in YouTube Studio before scheduling a batch. A successful API upload can still take time to process or be restricted by YouTube.
 
-If Google rejects access, check the selected project's enabled API, allowed test users and Desktop client type. If a token expires, reconnect. Do not disable browser security or attempt to evade Google's login checks.
+If Google rejects access, check the selected project's enabled API, publishing status and Desktop client type. Custom projects still in Testing require allowed test users. If a token expires, reconnect. Do not disable browser security or attempt to evade Google's login checks.
 
 ## How it works
 

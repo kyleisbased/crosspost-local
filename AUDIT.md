@@ -1,3 +1,10 @@
+# Google production access (2026-11-12)
+
+- With the owner's explicit approval, published the shared OAuth project as External / In production (unverified). Google Console displayed 1 user / 100 user cap; the tester list no longer applies.
+- Enabled YouTube Data API v3 after approval of its terms. Added the existing GitHub project homepage and public privacy policy to Google branding.
+- The shared client ID is unchanged, so version 0.2.1 installations receive this Google-side change automatically. No new desktop build is required for this configuration/documentation change.
+- Real-account token exchange and posting remain unverified. Prior managed-session network denial must not be described as a successful live test.
+
 # 0.2.1 Google client setup (2026-11-12)
 
 - Includes the public Crosspost Desktop OAuth client ID; private custom client imports still take priority. No client secret is shipped.

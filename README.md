@@ -10,9 +10,9 @@ A local dashboard for bulk importing vertical short videos, writing captions, an
 
 ## Connect
 
-**YouTube:** Google sign-in now opens in your normal browser. Uploads use the YouTube Data API. The old automated-browser Google login is disabled because Google rejects it. The Google desktop app ID is included. Each friend clicks Connect and signs into their own Google account and channel; no configuration file is needed. During testing, the app owner must enable YouTube Data API v3 and add each friend to the Google tester list. [One-time YouTube setup](YOUTUBE-SETUP.md).
+**YouTube:** Google sign-in now opens in your normal browser. Uploads use the YouTube Data API. The old automated-browser Google login is disabled because Google rejects it. The Google desktop app ID is included. Each friend clicks Connect and signs into their own Google account and channel; no configuration file is needed. The shared Google app is now In production (unverified), and YouTube Data API v3 is enabled. Individual tester invitations are not required. Google shows an unverified-app warning and limits this project to 100 users over its lifetime. [One-time YouTube setup](YOUTUBE-SETUP.md).
 
-Only the public Google desktop client ID is included; no client secret or account tokens are distributed. Google project activation and tester access must be complete before sign-in can succeed. Channel identity is verified through Google; no Google password is entered into Crosspost.
+Only the public Google desktop client ID is included; no client secret or account tokens are distributed. Use version 0.2.1 or later with the included Google client. The Google-side publishing change applies to existing installations without another app download. Channel identity is verified through Google; no Google password is entered into Crosspost.
 
 **Instagram and TikTok:** sign in in the separate browser window, verify the account, then return to save it. These integrations are experimental and can require help with login or verification prompts. Account labels are user-confirmed. Use a different profile for another set of accounts.
 
@@ -46,3 +46,7 @@ Use Node 24, npm install, npm run setup, then npm start. Source launchers are fo
 - npm run package:update: lightweight update asset. Bump package.json version for each release.
 
 Tests use simulated Google responses and never publish social posts. Passing tests does not establish real-account compatibility. See [AUDIT.md](AUDIT.md) for validation history.
+
+## Privacy
+
+Read the [Crosspost Local privacy policy](PRIVACY.md) for local storage, platform data sharing and how to revoke access or remove data.
