@@ -1,6 +1,12 @@
-# Crosspost Local audit — November 11, 2026
+# Crosspost Local audit - November 12, 2026
 
 Release decision: NOT ready for unattended production publishing.
+
+## Native build milestone
+
+The private repository is https://github.com/kyleisbased/crosspost-local. Native build run https://github.com/kyleisbased/crosspost-local/actions/runs/43128035816 succeeded for Windows x64, macOS Intel, and macOS Apple Silicon on commit `62ef405cb664c7f4d30824631c50445d6fc3746c`. Each platform passed all 31 automated tests, the real ten-video dashboard test, and the bundled Node/SQLite/server/Chromium smoke test. Three ZIP artifacts were produced. These checks do not test real platform sign-in, actual posting, OS download approval, or the GUI launcher through Explorer/Finder.
+
+The account showed unused included Actions compute and a $0 paid Actions budget before dispatch. No paid plan or paid-usage limit was enabled. Downloads through this local session are still restricted: the shell reported a socket access denial and Chrome blocked the artifact storage host. The successful remote artifacts are distinct from the earlier failed local Windows candidate.
 
 ## Verified
 
@@ -26,7 +32,7 @@ The real Chromium UI smoke test (`npm run test:ui`) passed against a temporary d
 - The packager no longer needs a native media tool. Node's matching distribution license was recovered from the locally installed MSI.
 - The launcher identifies the database served on its local port and refuses to silently open another installation's data.
 - Windows test-package assembly now completes. Default verified builds include an isolated local server/browser smoke test and preserve Mac browser-framework symlinks.
-- Native build jobs are prepared for Windows, Intel Mac and Apple Silicon Mac. They have not been executed.
+- Native build jobs now pass for Windows, Intel Mac and Apple Silicon Mac; see the milestone above.
 - Packages now contain a SHA-256 manifest. Checks detect changed, missing, or unexpected files and reject links that leave the app folder. These checks detect corruption; they do not replace code signing or prove runtime compatibility.
 - Failed native smoke tests are persisted in BUILD-STATUS.json, and the default build keeps the package in an unfinished .partial folder. Windows startup errors now show the native exit code even when startup never creates an app log.
 
@@ -37,11 +43,11 @@ The real Chromium UI smoke test (`npm run test:ui`) passed against a temporary d
 - A self-contained Windows test candidate is assembled with required components and licenses. The copied Node binary matches the installed binary's SHA-256 but exits with `0xC0000142` before startup in this execution session. The cause is not proven; the candidate is explicitly marked unverified. It is not a production release.
 - Testing the packaged files with the installed host runtime also exposed a packaged Chromium launch failure: its crash handler could not start. The installed browser cache passes the UI tests; the packaged browser has not passed them. Build-status metadata records both failures.
 - The latest native build attempt again failed with runtime code `0xC0000142`; its 504-file package manifest verified successfully. Available Windows event-log queries did not establish the underlying cause. No security settings were changed.
-- No accessible repository matching Crosspost was found in the connected GitHub account. The prepared native build workflow has no confirmed destination and has not run.
-- Mac installation, native Mac builds, sleep/logout behavior and large-file stress tests remain unverified.
+- The source and successful native builds are now stored in the private Crosspost repository.
+- GUI installation/first launch on recipient machines, sleep/logout behavior and large-file stress tests remain unverified.
 - Local scheduling initiates uploads at the target time; it does not guarantee simultaneous release. The machine must remain online and awake. Day intervals are fixed 24-hour periods, not daylight-saving-aware calendar recurrences.
 - Browser sessions remain sensitive local files. No independent encrypted credential vault is implemented. Users must verify the actual signed-in identity before posting.
 
 ## Next required validation
 
-Use a permitted execution environment with normal network access for real account tests. Complete sign-in and verification for each platform, test one explicitly chosen video on each destination, inspect the result, and test a small scheduled batch. Verify the Windows candidate on a clean machine, execute the native Mac build jobs, and test the resulting Mac apps. No social posts were made during this audit.
+Use a permitted execution environment with normal network access for real account tests. Complete sign-in and verification for each platform, test one explicitly chosen video on each destination, inspect the result, and test a small scheduled batch. Test Explorer/Finder first launch using the successful native CI packages on recipient machines. No social posts were made during this audit.

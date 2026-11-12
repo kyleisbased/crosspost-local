@@ -1,4 +1,4 @@
-# Crosspost Local — early access 0.1
+# Crosspost Local - early access 0.1
 
 ## Self-contained distribution (in preparation)
 
@@ -6,7 +6,9 @@ The friend-facing package is a Windows `Crosspost.exe` folder or macOS `Crosspos
 
 `npm run package:portable` builds for the developer machine's OS and architecture after dependencies, Chromium, and the Node distribution LICENSE are available. Set `CROSSPOST_NODE_LICENSE` if the LICENSE is not beside the Node executable. `runtime-notices/NODE-LICENSE.rtf` was recovered from this PC's matching Node 24.18.0 installer. The default build verifies its bundled runtime and a local browser/server session before finalizing the folder. `--assemble-only` explicitly skips execution tests and produces a clearly marked test candidate; it is not a validated release.
 
-A Windows test candidate has been assembled. Its bundled Node executable is byte-identical to the installed runtime but exits with Windows code `0xC0000142` in this execution session. It has not passed a clean-machine launch test. The GitHub workflow can build and verify native Windows, Intel Mac, and Apple Silicon Mac packages; it has been prepared but not run. Signing and real uploads remain unverified.
+Windows x64, Intel Mac, and Apple Silicon Mac test packages now pass their native GitHub build checks: 31 automated tests, the ten-video UI test, and an isolated launch of bundled Node, SQLite, the server, and Chromium. [View the successful build](https://github.com/kyleisbased/crosspost-local/actions/runs/43128035816). These are unsigned test packages; this does not establish real social-platform compatibility or a successful first launch on every friend's computer.
+
+The earlier locally assembled Windows candidate still fails in this execution session with `0xC0000142`. Use the native CI packages for further testing, not that older candidate. Real sign-in, actual uploads, and downloaded-app OS approval remain unverified.
 
 Portable releases keep private data in the current user's CrosspostLocal application-data folder, outside the release files. Existing development data is not automatically migrated. Never distribute the development `data/` folder.
 
@@ -23,7 +25,7 @@ A local publishing dashboard for vertical short videos, with profile-isolated ac
 
 The YouTube, Instagram, and TikTok browser adapters are **experimental**. They contain upload flows for English desktop interfaces, but have **not been tested against signed-in accounts**. Do not treat this version as a production unattended publisher. The first controlled live upload on each platform still needs to be verified, and selectors may need adjustment. Login challenges are never bypassed.
 
-Playwright 1.63.0 and matching Chromium are installed on the development PC, and the real local UI smoke test passes. Internet navigation from the publishing browser failed with `ERR_NETWORK_ACCESS_DENIED`, so real sign-in and posting are still unverified. No real social post was created during development. Mac launchers require a Mac test.
+Playwright 1.63.0 and matching Chromium are installed on the development PC, and the real local UI smoke test passes. Internet navigation from the publishing browser failed with `ERR_NETWORK_ACCESS_DENIED`, so real sign-in and posting are still unverified. No real social post was created during development. The native Mac bundle smoke tests pass in CI; Finder launch and sign-in on a friend's Mac still need testing.
 
 ## Source setup (for development and testing)
 
