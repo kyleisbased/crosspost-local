@@ -10,11 +10,15 @@ import { Store,platforms } from './store.mjs';
 import { Browsers,upload } from './browser.mjs';
 import { inspectVideo } from './media.mjs';
 import { dataIdentity } from './identity.mjs';
+import { YouTube } from './youtube.mjs';
 
 const appRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-export async function createApp({dataDir=process.env.CROSSPOST_DATA||path.join(appRoot,'data'),port=Number(process.env.PORT||4318),worker=true,browsers=new Browsers(path.join(dataDir,'sessions'))}={}){
+export async function createApp({dataDir=process.env.CROSSPOST_DATA||path.join(appRoot,'data'),port=Number(process.env.PORT||4318),worker=true,browsers=new Browsers(path.join(dataDir,'sessions')),youtube=new YouTube(dataDir)}={}){
   await mkdir(path.join(dataDir,'videos'),{recursive:true,mode:0o700});
   const store=new Store(path.join(dataDir,'crosspost.sqlite'),false);
+  await youtube.init();
+  for(const a of store.snapshot().accounts)if(a.platform==='youtube'&&a.confirmed&&!await youtube.hasToken(a.profile))store.disconnect(a.profile,'youtube');
+  const version=JSON.parse(await readFile(path.join(appRoot,'package.json'),'utf8')).version;
   const token=randomBytes(32).toString('hex');let working=false,closing=false;
   const send=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(data));};
   const json=async req=>{let result='';for await(const c of req){result+=c;if(result.length>1024*1024)throw Error('Request too large.');}return JSON.parse(result||'{}');};
@@ -25,29 +29,43 @@ export async function createApp({dataDir=process.env.CROSSPOST_DATA||path.join(a
     try{
       const actual=server.address().port,origin=`http://127.0.0.1:${actual}`;
       if(![`127.0.0.1:${actual}`,`localhost:${actual}`].includes(req.headers.host))return send(res,403,{error:'Local access only.'});
+      const url=new URL(req.url,origin),route=url.pathname;
+      // Google navigates here cross-site. Only this state-protected GET callback is exempt.
+      if(req.method==='GET'&&route==='/oauth/youtube/callback'){
+        const account=await youtube.callback(url.searchParams);store.profile(account.profile);
+        store.db.prepare("UPDATE accounts SET label=?,confirmed=1 WHERE profile=? AND platform='youtube'").run(account.label,account.profile);
+        res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><title>YouTube connected</title><h1>YouTube connected</h1><p>You can close this tab and return to Crosspost.</p><a href="/">Return to Crosspost</a>');return;
+      }
       if(req.headers.origin && ![origin,`http://localhost:${actual}`].includes(req.headers.origin))return send(res,403,{error:'Cross-origin requests are blocked.'});
       if(req.headers['sec-fetch-site']==='cross-site')return send(res,403,{error:'Cross-site requests are blocked.'});
-      const url=new URL(req.url,origin),route=url.pathname;
       if(req.method!=='GET'&&req.headers['x-crosspost-token']!==token)return send(res,403,{error:'Reload this local dashboard and try again.'});
-      if(req.method==='GET'&&route==='/api/health')return send(res,200,{app:'crosspost-local',version:'0.1.0',instance:dataIdentity(dataDir)});
-      if(req.method==='GET'&&route==='/api/state')return send(res,200,{...store.snapshot(),token,browserBusy:browsers.busy,version:'0.1.0',timezone:Intl.DateTimeFormat().resolvedOptions().timeZone});
+      if(req.method==='GET'&&route==='/api/health')return send(res,200,{app:'crosspost-local',version,instance:dataIdentity(dataDir)});
+      if(req.method==='GET'&&route==='/api/state')return send(res,200,{...store.snapshot(),token,browserBusy:browsers.busy||working,youtubeConfigured:!!youtube.config,version,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone});
+      if(req.method==='POST'&&route==='/api/youtube/config'){
+        if(working||browsers.busy)throw Error('Wait for the current upload to finish.');
+        await youtube.configure(await json(req));
+        store.db.prepare("UPDATE accounts SET confirmed=0 WHERE platform='youtube'").run();
+        return send(res,200,{ok:true});
+      }
       if(req.method==='POST'&&route==='/api/profiles')return send(res,201,store.addProfile((await json(req)).name));
       if(req.method==='POST'&&route==='/api/pause'){store.pause(Boolean((await json(req)).paused));return send(res,200,{ok:true});}
       if(req.method==='POST'&&route==='/api/connect'){
         const b=await json(req);store.profile(b.profile);if(!platforms.includes(b.platform))throw Error('Unknown platform.');
-        if(browsers.busy)throw Error('Wait for the current upload to finish.');
+        if(browsers.busy||working)throw Error('Wait for the current upload to finish.');
         // Suspend only this account, durably, until the user verifies it again.
         // Never change the user's global pause preference during account setup.
         store.disconnect(b.profile,b.platform);
+        if(b.platform==='youtube')return send(res,200,await youtube.connect(b.profile,origin));
         await browsers.connect(b.profile,b.platform);return send(res,200,{ok:true});
       }
       if(req.method==='POST'&&route==='/api/quit'){
         if(working||browsers.busy)throw Error('Wait for the current upload to finish before quitting.');
-        closing=true;store.pause(true);send(res,200,{ok:true});
+        const b=await json(req);closing=true;if(b.forUpdate!==true)store.pause(true);send(res,200,{ok:true});
         setTimeout(async()=>{clearInterval(timer);await browsers.closeAll();server.close(()=>store.close());},200);return;
       }
       if(req.method==='POST'&&route==='/api/account'){
         const b=await json(req);store.profile(b.profile);if(!platforms.includes(b.platform))throw Error('Unknown platform.');
+        if(b.platform==='youtube')throw Error('Use Google sign-in to verify your YouTube channel automatically.');
         if(browsers.busy)throw Error('Wait for the current upload to finish.');
         const label=String(b.label||'').trim();if(!label||label.length>100)throw Error('Enter the account handle you signed into.');
         if(!b.confirmed)throw Error('Confirm that you signed into the correct account.');
@@ -99,7 +117,7 @@ export async function createApp({dataDir=process.env.CROSSPOST_DATA||path.join(a
   store.recover();
   const tick=async()=>{
     if(working||closing||browsers.busy)return;working=true;
-    try{const job=store.claim();if(job){const result=await upload(browsers,job,store.video(job.video));if(result.needsReconnect)store.disconnect(job.profile,job.platform);store.finish(job.id,result.state,result.message,result.url);}}
+    try{const job=store.claim();if(job){const result=job.platform==='youtube'?await youtube.upload(job,store.video(job.video)):await upload(browsers,job,store.video(job.video));if(result.needsReconnect)store.disconnect(job.profile,job.platform);store.finish(job.id,result.state,result.message,result.url);}}
     catch(e){console.error('Worker:',e.message);}finally{working=false;}
   };
   const timer=worker?setInterval(tick,3000):null;

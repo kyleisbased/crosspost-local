@@ -12,21 +12,21 @@ test('account setup leaves global pause alone and verification closes the setup 
   const app=await createApp({port:0,dataDir:root,worker:false,browsers});
   t.after(async()=>{await app.close();await rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});});
   const base=`http://127.0.0.1:${app.port}`,state=await(await fetch(`${base}/api/state`)).json(),profile=state.profiles[0].id;
-  const post=(route,extra={})=>fetch(base+route,{method:'POST',headers:{'X-Crosspost-Token':state.token},body:JSON.stringify({profile,platform:'youtube',...extra})});
+  const post=(route,extra={})=>fetch(base+route,{method:'POST',headers:{'X-Crosspost-Token':state.token},body:JSON.stringify({profile,platform:'instagram',...extra})});
   app.store.db.prepare('UPDATE accounts SET confirmed=1').run();
   assert.equal((await post('/api/connect')).status,200);assert.equal(app.store.paused(),false);
-  assert.equal(app.store.snapshot().accounts.find(a=>a.platform==='youtube').confirmed,0);
+  assert.equal(app.store.snapshot().accounts.find(a=>a.platform==='instagram').confirmed,0);
   assert.equal((await post('/api/account',{label:'My channel',confirmed:true})).status,200);
   assert.equal(closed,1);assert.equal(browsers.busy,false);
-  assert.equal(app.store.snapshot().accounts.find(a=>a.platform==='youtube').confirmed,1);
+  assert.equal(app.store.snapshot().accounts.find(a=>a.platform==='instagram').confirmed,1);
   app.store.pause(true);fail=true;assert.equal((await post('/api/connect')).status,400);
-  assert.equal(app.store.paused(),true);assert.equal(app.store.snapshot().accounts.find(a=>a.platform==='youtube').confirmed,0);
+  assert.equal(app.store.paused(),true);assert.equal(app.store.snapshot().accounts.find(a=>a.platform==='instagram').confirmed,0);
 });
 test('local HTTP app serves dashboard, protects writes and isolates profiles',async t=>{
   const root=await mkdtemp(path.join(tmpdir(),'crosspost-http-'));const app=await createApp({port:0,dataDir:root,worker:false});t.after(async()=>{await app.close();await rm(root,{recursive:true,force:true});});const base=`http://127.0.0.1:${app.port}`;
   const home=await fetch(base);assert.equal(home.status,200);assert.match(await home.text(),/Add videos/);assert.match(home.headers.get('content-security-policy'),/frame-ancestors 'none'/);
   const state=await(await fetch(`${base}/api/state`)).json();assert.equal(state.profiles.length,1);
-  const fake=await fetch(`${base}/api/account`,{method:'POST',headers:{'X-Crosspost-Token':state.token},body:JSON.stringify({profile:state.profiles[0].id,platform:'youtube',label:'Not really connected',confirmed:true})});assert.equal(fake.status,400);assert.match((await fake.json()).error,/sign-in browser/);
+  const fake=await fetch(`${base}/api/account`,{method:'POST',headers:{'X-Crosspost-Token':state.token},body:JSON.stringify({profile:state.profiles[0].id,platform:'youtube',label:'Not really connected',confirmed:true})});assert.equal(fake.status,400);assert.match((await fake.json()).error,/Google sign-in/);
   assert.ok(app.store.snapshot().accounts.every(a=>!a.confirmed));
   let result=await fetch(`${base}/api/profiles`,{method:'POST',body:JSON.stringify({name:'No token'})});assert.equal(result.status,403);
   result=await fetch(`${base}/api/profiles`,{method:'POST',headers:{'X-Crosspost-Token':state.token,Origin:'https://evil.example'},body:JSON.stringify({name:'Bad origin'})});assert.equal(result.status,403);

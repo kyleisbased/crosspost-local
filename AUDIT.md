@@ -1,3 +1,13 @@
+# Version 0.2 validation - November 11, 2026 (Central)
+
+YouTube browser login is disabled. Desktop OAuth uses the system browser, PKCE, expiring single-use state, profile-isolated refresh tokens and Google-verified channel identity. API uploads hold ambiguous or non-public results for review. A Google client is not configured in the distribution; real sign-in and social publishing remain unverified.
+
+The lightweight updater checks SHA-256 and dependency compatibility, rejects unsafe paths, preserves private data, refuses active uploads, rolls back file failures and restarts the app. An actual CLI test verifies shutdown, installation, restart, saved queue/account retention and no-op repeat updates with simulated GitHub downloads.
+
+Local validation: 52 tests passed; ten-video UI test passed, including simulated Google setup/callback, captions, 30 queued destinations and 390px layout. Native builds are recorded in GitHub Actions. Historical results below describe earlier versions.
+
+---
+
 # Crosspost Local audit - November 12, 2026
 
 Release decision: NOT ready for unattended production publishing.

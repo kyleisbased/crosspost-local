@@ -1,10 +1,11 @@
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-import {mkdirSync,openSync,closeSync} from 'node:fs';
+import {mkdirSync,openSync,closeSync,existsSync} from 'node:fs';
 import {once} from 'node:events';
 import {dataIdentity} from '../src/identity.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+if(existsSync(path.join(root,'.crosspost-update')))throw Error('An update is running or was interrupted. Wait for it to finish, or run the updater with --recover.');
 const port=Number(process.env.PORT||4318);
 if(!Number.isInteger(port)||port<1||port>65535)throw Error('Choose a local port between 1 and 65535.');
 const url=`http://127.0.0.1:${port}`;

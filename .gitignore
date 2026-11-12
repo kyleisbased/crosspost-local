@@ -3,3 +3,5 @@ data/
 .npm-cache/
 *.log
 releases/
+update-release/
+.crosspost-update/

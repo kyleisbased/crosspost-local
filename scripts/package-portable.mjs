@@ -32,7 +32,12 @@ await mkdir(path.join(app,'runtime'),{recursive:true});
 await mkdir(path.join(app,'scripts'),{recursive:true});
 await mkdir(path.join(app,'node_modules'),{recursive:true});
 for(const name of ['src','public','package.json'])await cp(path.join(root,name),path.join(app,name),{recursive:true});
-for(const name of ['launch.mjs','portable-launch.mjs','verify-bundle.mjs'])await cp(path.join(root,'scripts',name),path.join(app,'scripts',name));
+for(const name of ['launch.mjs','portable-launch.mjs','verify-bundle.mjs','update.mjs'])await cp(path.join(root,'scripts',name),path.join(app,'scripts',name));
+for(const name of ['README.md','YOUTUBE-SETUP.md','UPDATE.md','AGENTS.md','Update-Windows.cmd','Update-Mac.command'])await cp(path.join(root,name),path.join(app,name));
+if(process.platform==='darwin'){
+  await cp(path.join(root,'Update-Mac.command'),path.join(out,'Update-Mac.command'));
+  await chmod(path.join(out,'Update-Mac.command'),0o755);await chmod(path.join(app,'Update-Mac.command'),0o755);
+}
 for(const name of ['playwright','playwright-core'])await cp(path.join(root,'node_modules',name),path.join(app,'node_modules',name),{recursive:true});
 await cp(process.execPath,path.join(app,'runtime',process.platform==='win32'?'node.exe':'node'));
 await cp(nodeLicense,path.join(app,'runtime',`NODE-LICENSE${path.extname(nodeLicense)||'.txt'}`));
@@ -43,7 +48,7 @@ if(process.platform==='win32'){
  await exec(csc,['/nologo','/target:winexe','/reference:System.Windows.Forms.dll',`/out:${path.join(out,'Crosspost.exe')}`,path.join(root,'scripts','WindowsLauncher.cs')],{windowsHide:true});
 }else{
  const contents=path.join(out,'Crosspost.app','Contents');await mkdir(path.join(contents,'MacOS'),{recursive:true});
- await writeFile(path.join(contents,'Info.plist'),`<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleName</key><string>Crosspost</string><key>CFBundleIdentifier</key><string>local.crosspost.app</string><key>CFBundleExecutable</key><string>Crosspost</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleVersion</key><string>0.1.0</string></dict></plist>`);
+ await writeFile(path.join(contents,'Info.plist'),`<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleName</key><string>Crosspost</string><key>CFBundleIdentifier</key><string>local.crosspost.app</string><key>CFBundleExecutable</key><string>Crosspost</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleVersion</key><string>0.2.0</string></dict></plist>`);
  const launcher=path.join(contents,'MacOS','Crosspost');await cp(path.join(root,'scripts','MacLauncher.sh'),launcher);await chmod(launcher,0o755);
  await chmod(path.join(app,'runtime','node'),0o755);
 }

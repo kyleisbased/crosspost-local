@@ -11,6 +11,7 @@ export function browserError(error){
 export class Browsers {
   constructor(root){this.root=root;this.sessions=new Map();this.busy=false;}
   async open(profile,platform){
+    if(platform==='youtube')throw Error('Connect YouTube with Google sign-in in your normal browser. Automated Google sign-in is not supported.');
     const key=`${profile}-${platform}`;
     if(this.sessions.has(key))return this.sessions.get(key);
     const directory=path.join(this.root,key);await mkdir(directory,{recursive:true,mode:0o700});
@@ -82,21 +83,6 @@ export async function upload(browsers,job,video){
 }
 
 const adapters={
-  async youtube(page,video,text,commit){
-    await click(page.getByRole('button',{name:/^Create$/i}));
-    await click(page.getByText('Upload videos',{exact:true}));
-    await page.locator('input[type="file"]').setInputFiles(video.path);
-    const fields=page.locator('ytcp-social-suggestions-textbox #textbox');
-    await fill(fields.nth(0),video.title);await fill(fields.nth(1),video.description);
-    // Audience classification must be set explicitly by the user in the queue UI.
-    await click(page.getByText(video.metadata.madeForKids?"Yes, it's made for kids":"No, it's not made for kids",{exact:true}));
-    for(let n=0;n<3;n++)await click(page.getByRole('button',{name:'Next',exact:true}));
-    await click(page.getByRole('radio',{name:/^Public/}));
-    commit();await click(page.getByRole('button',{name:'Publish',exact:true}));
-    await success(page,/^Video published[.!]?$/i);
-    const link=await page.locator('a[href*="youtu.be/"]').first().getAttribute('href').catch(()=>null);
-    return link;
-  },
   async instagram(page,video,text,commit){
     await click(page.getByRole('link',{name:/^New post$|^Create$/i}));
     await page.locator('input[type="file"]').setInputFiles(video.path);

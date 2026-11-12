@@ -26,6 +26,16 @@ jobs:
         run: choco install ffmpeg --no-progress -y
       - run: npm test
       - run: npm run test:ui
+      - name: Package lightweight app update
+        if: runner.os == 'Windows'
+        run: npm run package:update
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: Crosspost-App-Update
+          path: update-release/Crosspost-update.json
+          if-no-files-found: error
+          retention-days: 1
       - name: Build native package
         shell: bash
         run: CROSSPOST_NODE_LICENSE="$GITHUB_WORKSPACE/runtime-notices/NODE-LICENSE.rtf" npm run package:portable
