@@ -15,7 +15,10 @@ async function fixture(t){
   const calls=[];let now=100000,opened;
   const yt=new YouTube(dir,{now:()=>now,openBrowser:async url=>{opened=url;},fetcher:async(url,options)=>{
     calls.push({url,options});
-    if(url.includes('/token'))return json({access_token:'fixture-access',refresh_token:'fixture-refresh',expires_in:3600,scope});
+    if(url.includes('/token')){
+      if(!new URLSearchParams(options.body).get('client_secret'))return json({error:'invalid_request',error_description:'client_secret is missing.'},{status:400});
+      return json({access_token:'fixture-access',refresh_token:'fixture-refresh',expires_in:3600,scope});
+    }
     if(url.includes('/channels'))return json({items:[{id:'UC-fixture',snippet:{title:'Test channel'}}]});
     throw Error('Unexpected request');
   }});
@@ -28,20 +31,29 @@ async function authorize(yt,profile='profile-1'){
   return {url,result:await yt.callback(new URLSearchParams({state:url.searchParams.get('state'),code:'fixture-code'}))};
 }
 
-test('fresh installations authorize and refresh using the bundled public client without a secret',async t=>{
+test('fresh installations send the installed-app credential for both exchange and refresh',async t=>{
   const f=await fixture(t);
   await rm(path.join(f.dir,'youtube','client.json'));
   await f.yt.init();
   const {url}=await authorize(f.yt);
   assert.equal(url.searchParams.get('client_id'),desktopClientId);
-  assert.equal(new URLSearchParams(f.calls[0].options.body).has('client_secret'),false);
+  assert.ok(new URLSearchParams(f.calls[0].options.body).get('client_secret'));
   f.now(9999999);await f.yt.accessToken('profile-1');
   const body=new URLSearchParams(f.calls.at(-1).options.body);
   assert.equal(body.get('client_id'),desktopClientId);
-  assert.equal(body.has('client_secret'),false);
+  assert.ok(body.get('client_secret'));
   await f.yt.configure(config);await f.yt.init();
   assert.equal(f.yt.config.client_id,config.installed.client_id);
   assert.equal(await f.yt.hasToken('profile-1'),false);
+});
+
+test('ID-only shared client settings are repaired while custom projects remain unchanged',async t=>{
+  const f=await fixture(t);
+  await writeFile(path.join(f.dir,'youtube','client.json'),JSON.stringify({client_id:desktopClientId}));
+  await f.yt.init();await authorize(f.yt);
+  assert.ok(new URLSearchParams(f.calls[0].options.body).get('client_secret'));
+  await f.yt.configure(config);await f.yt.init();
+  assert.equal(f.yt.config.client_secret,'fixture-only');
 });
 test('Google login opens normal browser with PKCE and callback verifies channel identity',async t=>{
   const f=await fixture(t),{url,result}=await authorize(f.yt);
@@ -109,3 +121,23 @@ test('HTTP callback permits only valid OAuth state and never exposes Google toke
   assert.equal(JSON.parse(body).accounts.find(a=>a.platform==='youtube').confirmed,1);
   } finally { await app.close(); }
 });
+
+test('OAuth 400 identifies the failing step without exposing response secrets',async t=>{
+  const f=await fixture(t);
+  f.yt.fetch=async()=>json({error:'invalid_request',error_description:'client_secret is missing. private-fixture-value'},{status:400});
+  await assert.rejects(authorize(f.yt),e=>/Google sign-in token exchange failed \(400: invalid_request\)/.test(e.message)&&/desktop client credential/.test(e.message)&&!e.message.includes('private-fixture-value')&&!e.message.includes('retrying an upload'));
+  assert.equal(await f.yt.hasToken('profile-1'),false);
+});
+
+test('failed sign-in returns a readable escaped page and leaves account disconnected',async t=>{
+  const f=await fixture(t);f.yt.callback=async()=>{throw Error('Token exchange <failed> & rejected');};
+  const app=await createApp({dataDir:f.dir,port:0,worker:false,youtube:f.yt});
+  try{
+    const base=`http://127.0.0.1:${app.port}`;
+    const r=await fetch(base+'/oauth/youtube/callback?state=fixture&code=fixture');
+    assert.equal(r.status,400);assert.match(r.headers.get('content-type'),/text\/html/);
+    const body=await r.text();assert.match(body,/No video was uploaded/);assert.match(body,/Token exchange &lt;failed&gt; &amp; rejected/);assert.doesNotMatch(body,/<failed>/);
+    const state=await(await fetch(base+'/api/state')).json();assert.ok(state.accounts.every(a=>!a.confirmed));
+  }finally{await app.close();}
+});
+
