@@ -151,4 +151,4 @@ async function main(){
   const [code]=await once(child,'exit');if(code!==0)throw Error('Update installed, but the app could not restart. Open its normal launcher.');
   console.log('Check Accounts for any reconnection instructions. Older versions may leave the queue paused after updating.');
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(e=>{console.error(e.message);process.exitCode=1;});
+if(process.argv[1]&&(await realpath(process.argv[1]).catch(()=>null))===(await realpath(fileURLToPath(import.meta.url))))main().catch(e=>{console.error(e.message);process.exitCode=1;});

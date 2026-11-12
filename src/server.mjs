@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { createReadStream,createWriteStream } from 'node:fs';
-import { mkdir,readFile,unlink,stat } from 'node:fs/promises';
+import { mkdir,readFile,unlink,stat,realpath } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -137,7 +137,7 @@ async function receive(req,profile,filename,dataDir,store){
   }catch(e){await unlink(file).catch(()=>{});throw e;}
 }
 
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+if(process.argv[1]&&(await realpath(process.argv[1]).catch(()=>null))===(await realpath(fileURLToPath(import.meta.url)))){
   const app=await createApp();console.log(`Crosspost Local is ready: http://127.0.0.1:${app.port}`);
   for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>app.close().then(()=>process.exit(0)));
 }
