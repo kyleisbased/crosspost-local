@@ -4,6 +4,10 @@ Release decision: NOT ready for unattended production publishing.
 
 ## Latest source fixes (November 11, 2026, Central time)
 
+These fixes passed native build 43133612545 on all three platforms, on commit `976ce26f3d0904c7849eb964231f2a1cd6d74f54`. Each passed 38 automated tests, the ten-video UI test, bundled runtime/browser smoke checks, and actual-launcher start/reopen/quit checks. Release-saving run 43133943221 succeeded. The current private test downloads are https://github.com/kyleisbased/crosspost-local/releases/tag/v0.1.0-test-43133612545, with all three ZIPs and SHA256SUMS.txt uploaded. This supersedes the older build milestone below. The running local app includes these fixes and retains two profiles, one video, zero jobs and the existing paused state.
+
+Source-transfer note: a console encoding conversion initially changed Unicode punctuation in one source file. The transfer was corrected using byte-preserving input, and Git blob hashes for all changed files were compared with the local source before the successful build.
+
 - Account setup no longer pauses all profiles and platforms. It clears only the selected account's readiness; the durable scheduler skips that account until verification succeeds, including across restarts.
 - Verification closes the setup browser before restoring readiness. Each upload checks session readiness before selecting a file, and expired sessions hold remaining jobs for that account.
 - Upload windows close after attempts to limit accumulated browser processes. Ambiguous final outcomes remain Needs attention; they are never automatically retried.
