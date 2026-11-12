@@ -1,6 +1,11 @@
 name: Save verified desktop test release
 on:
   workflow_dispatch:
+    inputs:
+      build_run:
+        description: Successful native build run ID
+        required: true
+        type: string
 permissions:
   contents: write
   actions: read
@@ -11,15 +16,16 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      BUILD_RUN: '43128035816'
-      BUILD_COMMIT: '62ef405cb664c7f4d30824631c50445d6fc3746c'
+      BUILD_RUN: ${{ inputs.build_run }}
     steps:
       - name: Verify completed native builds
         shell: bash
         run: |
           set -euo pipefail
+          [[ "$BUILD_RUN" =~ ^[0-9]+$ ]]
           gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN" > run.json
-          jq -e --arg sha "$BUILD_COMMIT" '.conclusion == "success" and .head_sha == $sha and .name == "Build desktop test packages"' run.json
+          jq -e --arg repo "$GH_REPO" '.conclusion == "success" and .event == "workflow_dispatch" and .head_repository.full_name == $repo and .path == ".github/workflows/build.yml"' run.json
+          echo "BUILD_COMMIT=$(jq -r .head_sha run.json)" >> "$GITHUB_ENV"
           gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN/jobs" > jobs.json
           jq -e '.total_count == 3 and ([.jobs[] | select(.conclusion == "success")] | length == 3)' jobs.json
       - name: Collect the tested archives
@@ -41,8 +47,9 @@ jobs:
 
           Download the ZIP for your computer, extract it completely, and open Crosspost.exe or Crosspost.app. Node and Chromium are included. Friends do not need developer tools or GitHub to run a ZIP you give them.
 
-          All three native builds passed 31 automated tests, the ten-video dashboard test, and an isolated bundled Node/SQLite/server/Chromium launch check. Build evidence: https://github.com/kyleisbased/crosspost-local/actions/runs/43128035816
+          All three native builds passed automated tests, the ten-video dashboard test, the bundled Node/SQLite/server/Chromium check, and an isolated actual-launcher start/reopen/quit check. The Mac launcher is executed directly; Finder and downloaded-app approval still require recipient-machine testing.
 
           These are unsigned TEST packages. Real account sign-in and publication to YouTube, Instagram and TikTok have not been verified. This is not a production unattended-publishing release. Keep the computer awake and online for local scheduled work. Existing development data is not automatically migrated.
           NOTES
-          gh release create v0.1.0-desktop-test release/* --target "$BUILD_COMMIT" --prerelease --latest=false --title "Crosspost 0.1 desktop test packages" --notes-file notes.md
+          printf '\nBuild evidence: https://github.com/%s/actions/runs/%s\n' "$GH_REPO" "$BUILD_RUN" >> notes.md
+          gh release create "v0.1.0-test-$BUILD_RUN" release/* --target "$BUILD_COMMIT" --prerelease --latest=false --title "Crosspost desktop test $BUILD_RUN" --notes-file notes.md

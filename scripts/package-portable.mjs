@@ -4,6 +4,7 @@ import {promisify} from 'node:util';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {writePackageManifest,verifyPackageManifest} from '../src/release-integrity.mjs';
+import {verifyLauncher} from './verify-launcher.mjs';
 const exec=promisify(execFile);
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const target=`${process.platform}-${process.arch}`;
@@ -43,13 +44,13 @@ if(process.platform==='win32'){
 }else{
  const contents=path.join(out,'Crosspost.app','Contents');await mkdir(path.join(contents,'MacOS'),{recursive:true});
  await writeFile(path.join(contents,'Info.plist'),`<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleName</key><string>Crosspost</string><key>CFBundleIdentifier</key><string>local.crosspost.app</string><key>CFBundleExecutable</key><string>Crosspost</string><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleVersion</key><string>0.1.0</string></dict></plist>`);
- const launcher=path.join(contents,'MacOS','Crosspost');await writeFile(launcher,'#!/bin/bash\nset -e\ncd "$(dirname "$0")/../Resources/app"\nlogdir="$HOME/Library/Application Support/CrosspostLocal"\nmkdir -p "$logdir"\nif ! ./runtime/node ./scripts/portable-launch.mjs 2>"$logdir/launch.log"; then\n /usr/bin/osascript -e \'display alert "Crosspost could not start" message "Check launch.log in your Library/Application Support/CrosspostLocal folder for details." as critical\'\n exit 1\nfi\n');await chmod(launcher,0o755);
+ const launcher=path.join(contents,'MacOS','Crosspost');await cp(path.join(root,'scripts','MacLauncher.sh'),launcher);await chmod(launcher,0o755);
  await chmod(path.join(app,'runtime','node'),0o755);
 }
 // Check bundled executables, rather than relying on the developer's PATH.
 const node=path.join(app,'runtime',process.platform==='win32'?'node.exe':'node');
 await access(path.join(app,'browsers',path.basename(browserFolder),path.relative(browserFolder,browserExe)));
-const status={target,builtAt:new Date().toISOString(),bundledDependencyChecks:assembleOnly?'NOT RUN - assembly only':'pending',livePublishing:'NOT VERIFIED',signing:'NOT CONFIGURED'};
+const status={target,builtAt:new Date().toISOString(),bundledDependencyChecks:assembleOnly?'NOT RUN - assembly only':'pending',launcherChecks:assembleOnly?'NOT RUN - assembly only':'pending',livePublishing:'NOT VERIFIED',signing:'NOT CONFIGURED'};
 const manifestDetails={target,nodeVersion:process.versions.node,browserVersion:JSON.parse(await readFile(path.join(root,'node_modules','playwright','package.json'),'utf8')).version};
 await writeFile(path.join(out,'BUILD-STATUS.json'),JSON.stringify(status,null,2));
 await writePackageManifest(app,manifestDetails);
@@ -58,9 +59,13 @@ try{
   await exec(node,['--version'],{windowsHide:true,timeout:15000});
   await exec(node,[path.join(app,'scripts','verify-bundle.mjs')],{cwd:app,windowsHide:true,timeout:60000});
   status.bundledDependencyChecks='passed';
+  status.launcherChecks='running';
+  await verifyLauncher(process.platform==='win32'?path.join(out,'Crosspost.exe'):path.join(out,'Crosspost.app','Contents','MacOS','Crosspost'));
+  status.launcherChecks='passed';
  }
 }catch(error){
- status.bundledDependencyChecks='FAILED';
+ if(status.bundledDependencyChecks!=='passed')status.bundledDependencyChecks='FAILED';
+ if(status.launcherChecks==='running')status.launcherChecks='FAILED';
  status.failure={code:error.code||null,message:String(error.message).split('\n')[0]};
  await writeFile(path.join(out,'BUILD-STATUS.json'),JSON.stringify(status,null,2));
  await writePackageManifest(app,manifestDetails);

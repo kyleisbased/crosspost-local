@@ -27,7 +27,11 @@ internal static class CrosspostLauncher {
                         : error);
             }
         } catch (Exception error) {
-            MessageBox.Show(error.Message, "Crosspost", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Environment.ExitCode = 1;
+            if (Environment.GetEnvironmentVariable("CROSSPOST_NO_OPEN") == "1")
+                Console.Error.WriteLine(error.Message);
+            else
+                MessageBox.Show(error.Message, "Crosspost", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }

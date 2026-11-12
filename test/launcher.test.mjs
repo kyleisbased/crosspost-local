@@ -7,7 +7,11 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {createApp} from '../src/server.mjs';
+import {verifyLauncher} from '../scripts/verify-launcher.mjs';
 const exec=promisify(execFile);
+test('portable entry starts, reopens and shuts down an isolated app',async()=>{
+ await verifyLauncher(process.execPath,[fileURLToPath(new URL('../scripts/portable-launch.mjs',import.meta.url))]);
+});
 test('launcher reopens its own data and refuses another installation on the same port',async t=>{
  const dataDir=await mkdtemp(path.join(tmpdir(),'crosspost-launch-'));
  const app=await createApp({port:0,dataDir,worker:false});
