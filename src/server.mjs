@@ -32,9 +32,15 @@ export async function createApp({dataDir=process.env.CROSSPOST_DATA||path.join(a
       const url=new URL(req.url,origin),route=url.pathname;
       // Google navigates here cross-site. Only this state-protected GET callback is exempt.
       if(req.method==='GET'&&route==='/oauth/youtube/callback'){
+        try{
         const account=await youtube.callback(url.searchParams);store.profile(account.profile);
         store.db.prepare("UPDATE accounts SET label=?,confirmed=1 WHERE profile=? AND platform='youtube'").run(account.label,account.profile);
         res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><title>YouTube connected</title><h1>YouTube connected</h1><p>You can close this tab and return to Crosspost.</p><a href="/">Return to Crosspost</a>');return;
+        }catch(e){
+          const safe=String(e.message).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+          res.writeHead(400,{'Content-Type':'text/html; charset=utf-8'});
+          res.end('<!doctype html><title>YouTube connection failed</title><h1>YouTube was not connected</h1><p>'+safe+'</p><p>No video was uploaded by this sign-in attempt.</p><p>Return to Accounts and start a new connection. Reloading this page will not retry sign-in.</p><a href="/">Return to Crosspost</a>');return;
+        }
       }
       if(req.headers.origin && ![origin,`http://localhost:${actual}`].includes(req.headers.origin))return send(res,403,{error:'Cross-origin requests are blocked.'});
       if(req.headers['sec-fetch-site']==='cross-site')return send(res,403,{error:'Cross-site requests are blocked.'});
@@ -141,3 +147,4 @@ if(process.argv[1]&&(await realpath(process.argv[1]).catch(()=>null))===(await r
   const app=await createApp();console.log(`Crosspost Local is ready: http://127.0.0.1:${app.port}`);
   for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>app.close().then(()=>process.exit(0)));
 }
+
