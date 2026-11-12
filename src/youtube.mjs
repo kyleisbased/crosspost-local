@@ -4,11 +4,12 @@ import {createReadStream} from 'node:fs';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import path from 'node:path';
+import {desktopClient} from './desktop-client.mjs';
 
 const scopes=['https://www.googleapis.com/auth/youtube.upload','https://www.googleapis.com/auth/youtube.readonly'];
-// Desktop OAuth clients are public. PKCE protects each authorization exchange;
-// no client secret or account tokens belong in the distributed app.
-export const desktopClientId='339324138959-4aa8v02qckvq3tc7kcrvitb968j64rdu.apps.googleusercontent.com';
+// Google requires the registered installed-app credential for this client.
+// It cannot be kept confidential in a desktop app; PKCE protects the exchange.
+export const desktopClientId=desktopClient.client_id;
 export async function openGoogle(url){
   const parsed=new URL(url);
   if(parsed.origin!=='https://accounts.google.com')throw Error('Invalid Google sign-in URL.');
@@ -27,7 +28,12 @@ export class YouTube {
   constructor(dataDir,{fetcher=fetch,openBrowser=openGoogle,now=Date.now}={}){
     this.root=path.join(dataDir,'youtube');this.fetch=fetcher;this.openBrowser=openBrowser;this.now=now;this.pending=new Map();this.generations=new Map();this.config=null;
   }
-  async init(){this.config=await read(path.join(this.root,'client.json'))||{client_id:desktopClientId};return this;}
+  async init(){
+    this.config=await read(path.join(this.root,'client.json'))||{...desktopClient};
+    // Repair old ID-only copies of our client without overriding custom projects.
+    if(this.config.client_id===desktopClientId&&!this.config.client_secret)this.config={...desktopClient,...this.config,client_secret:desktopClient.client_secret};
+    return this;
+  }
   file(profile){if(!/^[a-zA-Z0-9_-]+$/.test(profile))throw Error('Invalid profile.');return path.join(this.root,profile+'.json');}
   async hasToken(profile){const value=await read(this.file(profile));return !!(this.config&&value?.client_id===this.config.client_id&&value.refresh_token);}
   async configure(input){
@@ -35,6 +41,7 @@ export class YouTube {
     if(!c||typeof c.client_id!=='string'||!/^[-a-zA-Z0-9_.]+\.apps\.googleusercontent\.com$/.test(c.client_id)||c.client_id.length>300)throw Error('Choose the Desktop app OAuth JSON downloaded from Google Cloud. Web app credentials will not work.');
     if(c.client_secret!==undefined&&(typeof c.client_secret!=='string'||c.client_secret.length>300))throw Error('Invalid desktop client settings.');
     this.config={client_id:c.client_id,client_secret:c.client_secret||''};this.pending.clear();this.generations.clear();
+    if(this.config.client_id===desktopClientId&&!this.config.client_secret)this.config.client_secret=desktopClient.client_secret;
     await save(path.join(this.root,'client.json'),this.config);
   }
   async connect(profile,origin){
@@ -50,36 +57,43 @@ export class YouTube {
     try{await this.openBrowser(url.href);}catch{/* The dashboard also offers this exact link. */}
     return {authorizationUrl:url.href};
   }
-  async request(url,options={}){
+  async request(url,options={},stage='YouTube request'){
     let r;try{r=await this.fetch(url,{...options,redirect:'error',signal:options.signal||AbortSignal.timeout(30000)});}catch{throw Error('Cannot reach Google. Check your connection and try again.');}
     if(!r.ok){
       const detail=await r.json().catch(()=>({}));
-      if(r.status===401||detail.error==='invalid_grant')throw authError('Google authorization expired or was revoked. Reconnect YouTube.');
-      if(detail.error==='invalid_client')throw authError('Google rejected the app credentials. Import the correct Desktop app JSON and reconnect.');
+      const code=typeof detail.error==='string'&&/^[a-z_]{1,60}$/.test(detail.error)?detail.error:null;
+      const prefix=`${stage} failed (${r.status}${code?': '+code:''}). `;
+      if(r.status===401||code==='invalid_grant')throw authError(prefix+'Google rejected the authorization code or refresh token. Start Connect YouTube again; do not refresh the callback page.');
+      if(code==='invalid_client')throw authError(prefix+'Google rejected Crosspost\'s desktop app credentials. Update Crosspost or contact its maintainer.');
+      if(code==='invalid_request'){
+        // Classify known descriptions, never echo arbitrary response text or tokens.
+        const missingSecret=/client_secret.*(?:missing|required)|(?:missing|required).*client_secret/i.test(String(detail.error_description||''));
+        throw Error(prefix+(missingSecret?'Google requires the desktop client credential missing from this installation. Update Crosspost or contact its maintainer.':'Google rejected the sign-in request parameters. Send this error to the Crosspost maintainer.'));
+      }
       const reason=detail.error?.errors?.[0]?.reason;
       if(reason==='quotaExceeded'||reason==='uploadLimitExceeded')throw Error('YouTube upload quota or account limit reached. Try again after the limit resets.');
       if(r.status===403)throw Error('Google denied access. Check YouTube API access, consent permissions, test-user access, and account upload limits in Google Cloud.');
-      throw Error(`Google request failed (${r.status}). Check YouTube before retrying an upload.`);
+      throw Error(prefix+'Send this error to the Crosspost maintainer.');
     }
     return r;
   }
   async exchange(config,fields){
     const credentials={client_id:config.client_id};
     if(config.client_secret)credentials.client_secret=config.client_secret;
-    const r=await this.request('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({...credentials,...fields}).toString()});
+    const r=await this.request('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({...credentials,...fields}).toString()},fields.grant_type==='refresh_token'?'Google session refresh':'Google sign-in token exchange');
     const token=await r.json();if(!token.access_token)throw authError('Google did not return an access token. Reconnect YouTube.');
     return {...token,expires_at:this.now()+Number(token.expires_in||3600)*1000};
   }
   async callback(params){
     const state=params.get('state'),p=this.pending.get(state);this.pending.delete(state);
     if(!p||p.expires<this.now())throw Error('This sign-in link expired or was already used. Start Connect YouTube again.');
-    if(params.has('error'))throw Error('Google sign-in was cancelled or denied. Check that this Google account is an allowed test user, then reconnect.');
+    if(params.has('error'))throw Error('Google sign-in was cancelled or denied. Reconnect and approve the requested permissions. Your Google account or organization may restrict access.');
     const code=params.get('code');if(!code||code.length>4096)throw Error('Google did not return a valid sign-in code.');
     const token=await this.exchange(p.config,{code,code_verifier:p.verifier,redirect_uri:p.redirect,grant_type:'authorization_code'});
     if(!token.refresh_token)throw Error('Google did not grant offline access. Reconnect YouTube and approve the requested permissions.');
     const granted=new Set(String(token.scope||'').split(' '));
     if(!scopes.every(s=>granted.has(s)))throw Error('Both upload and channel-read permissions are needed. Reconnect and approve both permissions.');
-    const r=await this.request('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',{headers:{Authorization:`Bearer ${token.access_token}`}});
+    const r=await this.request('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',{headers:{Authorization:`Bearer ${token.access_token}`}},'YouTube channel verification');
     const channels=(await r.json()).items;
     if(channels?.length!==1||!channels[0].id||!channels[0].snippet?.title)throw Error('Google did not return one YouTube channel. Create or select the correct channel and reconnect.');
     const channel=channels[0];
@@ -113,3 +127,4 @@ export class YouTube {
     }catch(e){return {state:'attention',message:(submitted?'The upload may have reached YouTube. Check Studio before retrying. ':'')+e.message,needsReconnect:!!e.needsReconnect};}
   }
 }
+
