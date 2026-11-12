@@ -1,4 +1,4 @@
-# Crosspost Local - early access 0.1
+# Crosspost Local — early access 0.1
 
 ## Latest publishing reliability fixes
 

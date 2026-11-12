@@ -32,19 +32,19 @@ export class Store {
     if(typeof title!=='string'||typeof description!=='string')throw Error('Title and description must be text.');
     this.video(id);
     if (this.db.prepare("SELECT id FROM jobs WHERE video=? AND state IN ('queued','running')").get(id)) throw Error('Cancel pending uploads before editing this video.');
-    if(!String(title).trim() || String(title).length>100) throw Error('Title must be 1-100 characters.');
+    if(!String(title).trim() || String(title).length>100) throw Error('Title must be 1–100 characters.');
     if(String(description).length>2000) throw Error('Shared description must be 2,000 characters or fewer.');
     this.db.prepare('UPDATE videos SET title=?,description=? WHERE id=?').run(String(title).trim(),String(description),id);
   }
   bulkCaption(ids,description){
-    if(!Array.isArray(ids)||!ids.length||ids.length>100||new Set(ids).size!==ids.length)throw Error('Select 1-100 unique videos.');
+    if(!Array.isArray(ids)||!ids.length||ids.length>100||new Set(ids).size!==ids.length)throw Error('Select 1–100 unique videos.');
     const list=ids.map(id=>this.video(id));
     if(new Set(list.map(v=>v.profile)).size!==1)throw Error('Edit one profile at a time.');
     this.db.exec('BEGIN IMMEDIATE');
     try{for(const v of list)this.editVideo(v.id,v.title,description);this.db.exec('COMMIT');}catch(e){this.db.exec('ROLLBACK');throw e;}
   }
   queue(ids,targets,start,interval) {
-    if(!Array.isArray(ids)||!ids.length||ids.length>100) throw Error('Select 1-100 videos.');
+    if(!Array.isArray(ids)||!ids.length||ids.length>100) throw Error('Select 1–100 videos.');
     if(!Array.isArray(targets)||!targets.length||targets.some(p=>!platforms.includes(p))) throw Error('Select a valid platform.');
     if(new Set(ids).size!==ids.length||new Set(targets).size!==targets.length) throw Error('Duplicate selections.');
     if(!Number.isFinite(start)||!Number.isFinite(interval)||interval<0||interval>31536000000) throw Error('Invalid schedule.');

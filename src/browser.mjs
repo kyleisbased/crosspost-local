@@ -4,7 +4,7 @@ import path from 'node:path';
 export const destinations={youtube:'https://studio.youtube.com/',instagram:'https://www.instagram.com/',tiktok:'https://www.tiktok.com/tiktokstudio/upload'};
 export function browserError(error){
   const message=String(error?.message||error);
-  if(message.includes('ERR_NETWORK_ACCESS_DENIED'))return 'This computer or execution environment blocked the browser's internet access. Account sign-in and publishing need network access. No connection was saved.';
+  if(message.includes('ERR_NETWORK_ACCESS_DENIED'))return 'This computer or execution environment blocked the browser’s internet access. Account sign-in and publishing need network access. No connection was saved.';
   if(/Executable doesn't exist|browserType\.launch.*executable/i.test(message))return 'The included browser is missing. Re-extract the complete app package, or run Setup if using the source version.';
   return message.replace(/\u001b\[[0-9;]*m/g,'').split('\n')[0].slice(0,350);
 }

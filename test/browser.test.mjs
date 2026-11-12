@@ -20,7 +20,7 @@ test('simultaneous connection requests are rejected and lock is released',async(
 test('network denial is actionable and never marks a connection successful',async()=>{
  const b=new Browsers('/unused');
  b.open=async()=>({pages:()=>[{goto:async()=>{throw Error('page.goto: net::ERR_NETWORK_ACCESS_DENIED\nCall log: private debugging details');}}]});
- await assert.rejects(b.connect('p','youtube'),/blocked the browser's internet access/);
+ await assert.rejects(b.connect('p','youtube'),/blocked the browser’s internet access/);
  assert.equal(b.busy,false);
  assert.doesNotMatch(browserError(Error('net::ERR_NETWORK_ACCESS_DENIED\nCall log: secret')),/secret|Call log/);
 });
