@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,rm,writeFile,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {YouTube} from '../src/youtube.mjs';
+import {YouTube,desktopClientId} from '../src/youtube.mjs';
 import {Browsers} from '../src/browser.mjs';
 import {createApp} from '../src/server.mjs';
 
@@ -27,6 +27,22 @@ async function authorize(yt,profile='profile-1'){
   const url=new URL(authorizationUrl);
   return {url,result:await yt.callback(new URLSearchParams({state:url.searchParams.get('state'),code:'fixture-code'}))};
 }
+
+test('fresh installations authorize and refresh using the bundled public client without a secret',async t=>{
+  const f=await fixture(t);
+  await rm(path.join(f.dir,'youtube','client.json'));
+  await f.yt.init();
+  const {url}=await authorize(f.yt);
+  assert.equal(url.searchParams.get('client_id'),desktopClientId);
+  assert.equal(new URLSearchParams(f.calls[0].options.body).has('client_secret'),false);
+  f.now(9999999);await f.yt.accessToken('profile-1');
+  const body=new URLSearchParams(f.calls.at(-1).options.body);
+  assert.equal(body.get('client_id'),desktopClientId);
+  assert.equal(body.has('client_secret'),false);
+  await f.yt.configure(config);await f.yt.init();
+  assert.equal(f.yt.config.client_id,config.installed.client_id);
+  assert.equal(await f.yt.hasToken('profile-1'),false);
+});
 test('Google login opens normal browser with PKCE and callback verifies channel identity',async t=>{
   const f=await fixture(t),{url,result}=await authorize(f.yt);
   assert.equal(f.opened(),url.href);assert.equal(url.origin,'https://accounts.google.com');assert.equal(url.searchParams.get('code_challenge_method'),'S256');

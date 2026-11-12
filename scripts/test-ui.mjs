@@ -28,10 +28,10 @@ try{
   await page.getByRole('heading',{name:'Your accounts'}).waitFor();
   assert.equal(app.store.snapshot().profiles.length,2);
   await page.locator('#accountSettings .account').first().getByRole('button',{name:'Connect',exact:true}).click();
-  assert.equal(await page.locator('#openBrowser').isDisabled(),true);
+  assert.equal(await page.locator('#openBrowser').isDisabled(),false);
   assert.equal(await page.getByRole('button',{name:'Verify connection',exact:true}).isVisible(),false);
   await page.locator('#connectDialog .close-dialog').click();
-  await page.getByText('YouTube setup',{exact:true}).click();
+  await page.getByText('Advanced YouTube setup',{exact:true}).click();
   await page.locator('#youtubeClient').setInputFiles({name:'test-client.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({installed:{client_id:'123-test.apps.googleusercontent.com',client_secret:'test-only'}}))});
   await page.getByText('Google app configured. Connect YouTube above.',{exact:true}).waitFor();
   await page.locator('#accountSettings .account').first().getByRole('button',{name:'Connect',exact:true}).click();

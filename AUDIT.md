@@ -1,3 +1,11 @@
+# 0.2.1 Google client setup (2026-11-12)
+
+- Includes the public Crosspost Desktop OAuth client ID; private custom client imports still take priority. No client secret is shipped.
+- Omits the optional secret field when absent; PKCE remains required for code exchange.
+- Local validation: 53 tests passed, ten-video UI workflow passed, lightweight update packaged. Tests simulate Google responses.
+- Google policy accepted, desktop client created, requested upload/read scopes saved, owner added as tester.
+- Pending: separate YouTube API terms/activation, friends' tester emails, real-account sign-in and upload. This managed session denies outbound token-endpoint access (EACCES), so live exchange was not verified.
+
 # Version 0.2 validation - November 11, 2026 (Central)
 
 YouTube browser login is disabled. Desktop OAuth uses the system browser, PKCE, expiring single-use state, profile-isolated refresh tokens and Google-verified channel identity. API uploads hold ambiguous or non-public results for review. A Google client is not configured in the distribution; real sign-in and social publishing remain unverified.

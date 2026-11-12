@@ -1,4 +1,4 @@
-# Crosspost Local 0.2
+# Crosspost Local 0.2.1
 
 A local dashboard for bulk importing vertical short videos, writing captions, and scheduling uploads to YouTube, Instagram and TikTok. Profiles keep each set of accounts apart. No publishing subscription or AI credits are required.
 
@@ -10,9 +10,9 @@ A local dashboard for bulk importing vertical short videos, writing captions, an
 
 ## Connect
 
-**YouTube:** Google sign-in now opens in your normal browser. Uploads use the YouTube Data API. The old automated-browser Google login is disabled because Google rejects it. The app owner must configure a Google Desktop OAuth client, enable YouTube Data API v3, and allow the testers. Each installation imports the client JSON, then each friend signs into their own Google account and channel. [One-time YouTube setup](YOUTUBE-SETUP.md).
+**YouTube:** Google sign-in now opens in your normal browser. Uploads use the YouTube Data API. The old automated-browser Google login is disabled because Google rejects it. The Google desktop app ID is included. Each friend clicks Connect and signs into their own Google account and channel; no configuration file is needed. During testing, the app owner must enable YouTube Data API v3 and add each friend to the Google tester list. [One-time YouTube setup](YOUTUBE-SETUP.md).
 
-Google app credentials are not included. YouTube cannot connect until this configuration is complete. Channel identity is verified through Google; no Google password is entered into Crosspost.
+Only the public Google desktop client ID is included; no client secret or account tokens are distributed. Google project activation and tester access must be complete before sign-in can succeed. Channel identity is verified through Google; no Google password is entered into Crosspost.
 
 **Instagram and TikTok:** sign in in the separate browser window, verify the account, then return to save it. These integrations are experimental and can require help with login or verification prompts. Account labels are user-confirmed. Use a different profile for another set of accounts.
 
@@ -41,7 +41,7 @@ Portable Windows: LOCALAPPDATA/CrosspostLocal. Mac: ~/Library/Application Suppor
 Use Node 24, npm install, npm run setup, then npm start. Source launchers are for developers; use portable packages for friends.
 
 - npm test: database, HTTP, account isolation, OAuth, upload responses, updater rollback and actual updater stop/install/restart tests.
-- npm run test:ui: simulated Google setup, ten videos, captions, thirty queued destinations, pause/cancel and 390px layout. FFmpeg generates test media only.
+- npm run test:ui: default sign-in and optional custom Google setup, ten videos, captions, thirty queued destinations, pause/cancel and 390px layout. FFmpeg generates test media only.
 - npm run package:portable: native package, runtime/browser integrity and actual-launcher checks. CROSSPOST_NODE_LICENSE supplies the matching Node license when needed.
 - npm run package:update: lightweight update asset. Bump package.json version for each release.
 

@@ -6,6 +6,9 @@ import {once} from 'node:events';
 import path from 'node:path';
 
 const scopes=['https://www.googleapis.com/auth/youtube.upload','https://www.googleapis.com/auth/youtube.readonly'];
+// Desktop OAuth clients are public. PKCE protects each authorization exchange;
+// no client secret or account tokens belong in the distributed app.
+export const desktopClientId='339324138959-4aa8v02qckvq3tc7kcrvitb968j64rdu.apps.googleusercontent.com';
 export async function openGoogle(url){
   const parsed=new URL(url);
   if(parsed.origin!=='https://accounts.google.com')throw Error('Invalid Google sign-in URL.');
@@ -24,7 +27,7 @@ export class YouTube {
   constructor(dataDir,{fetcher=fetch,openBrowser=openGoogle,now=Date.now}={}){
     this.root=path.join(dataDir,'youtube');this.fetch=fetcher;this.openBrowser=openBrowser;this.now=now;this.pending=new Map();this.generations=new Map();this.config=null;
   }
-  async init(){this.config=await read(path.join(this.root,'client.json'));return this;}
+  async init(){this.config=await read(path.join(this.root,'client.json'))||{client_id:desktopClientId};return this;}
   file(profile){if(!/^[a-zA-Z0-9_-]+$/.test(profile))throw Error('Invalid profile.');return path.join(this.root,profile+'.json');}
   async hasToken(profile){const value=await read(this.file(profile));return !!(this.config&&value?.client_id===this.config.client_id&&value.refresh_token);}
   async configure(input){
@@ -61,7 +64,9 @@ export class YouTube {
     return r;
   }
   async exchange(config,fields){
-    const r=await this.request('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({...config,...fields}).toString()});
+    const credentials={client_id:config.client_id};
+    if(config.client_secret)credentials.client_secret=config.client_secret;
+    const r=await this.request('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({...credentials,...fields}).toString()});
     const token=await r.json();if(!token.access_token)throw authError('Google did not return an access token. Reconnect YouTube.');
     return {...token,expires_at:this.now()+Number(token.expires_in||3600)*1000};
   }
