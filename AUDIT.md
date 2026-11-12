@@ -8,6 +8,8 @@ The private repository is https://github.com/kyleisbased/crosspost-local. Native
 
 The account showed unused included Actions compute and a $0 paid Actions budget before dispatch. No paid plan or paid-usage limit was enabled. Downloads through this local session are still restricted: the shell reported a socket access denial and Chrome blocked the artifact storage host. The successful remote artifacts are distinct from the earlier failed local Windows candidate.
 
+The three tested archives and SHA256SUMS.txt are preserved in the private prerelease https://github.com/kyleisbased/crosspost-local/releases/tag/v0.1.0-desktop-test. Preservation run 43128712771 succeeded and the release API confirmed all four assets uploaded. The release points at the exact tested source commit. No new app code was introduced while preserving the packages.
+
 ## Verified
 
 31 automated tests pass on Windows / Node 24. These cover real MP4 ingestion and validation, ranged preview responses, editing, three-destination scheduling records, batch spacing, pause/resume dispatch, cancellation, draft deletion protection, duplicate prevention, profile separation, atomic bulk captions, rejected invalid metadata, rejected cross-origin writes, interrupted-job recovery, launcher data identity checks, package integrity checks, and browser failure/verification logic using test doubles. Test doubles do not demonstrate real platform compatibility.

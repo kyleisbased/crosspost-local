@@ -1,6 +1,8 @@
 # Crosspost Local - early access 0.1
 
-## Self-contained distribution (in preparation)
+## Self-contained distribution (test builds)
+
+[Download the private desktop test release](https://github.com/kyleisbased/crosspost-local/releases/tag/v0.1.0-desktop-test). Choose Windows, Mac Apple Silicon, or Mac Intel, extract the whole ZIP, then open Crosspost.exe or Crosspost.app. You can give the downloaded ZIP to a friend; they do not need GitHub or separately installed developer tools to run it. These unsigned packages still need recipient-machine and live-account testing.
 
 The friend-facing package is a Windows `Crosspost.exe` folder or macOS `Crosspost.app`, with Node and Chromium bundled. MP4 metadata inspection is built into the app, so no media tool is installed. The setup scripts below are for source development, not the intended friend experience.
 
