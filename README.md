@@ -6,7 +6,7 @@ Account setup now holds only the selected account's jobs. Other connected accoun
 
 Publish now defaults to uploading the selected batch consecutively. Scheduled batches show their spacing and timezone before submission. The dashboard shows connected account names, prevents reselecting destinations with existing uploads, and explains when a queued job is waiting for its account. Publication confirmation no longer accepts TikTok's generic upload-complete message or YouTube's scheduled message as proof of publication.
 
-Local validation: 37 automated tests plus the ten-video dashboard test. These fixes still require real platform validation; all three publishing-browser sign-in pages returned ERR_NETWORK_ACCESS_DENIED in this execution environment on November 11, 2026 (Central time). Do not treat local tests as proof of unattended social publishing.
+Local validation: 38 automated tests plus the ten-video dashboard test. Background sign-in checks wait for delayed page rendering before deciding a session needs attention. These fixes still require real platform validation; all three publishing-browser sign-in pages returned ERR_NETWORK_ACCESS_DENIED in this execution environment on November 11, 2026 (Central time). Do not treat local tests as proof of unattended social publishing.
 
 ## Self-contained distribution (test builds)
 

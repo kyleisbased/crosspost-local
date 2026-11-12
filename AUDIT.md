@@ -10,7 +10,7 @@ Release decision: NOT ready for unattended production publishing.
 - Generic TikTok upload-complete text and YouTube scheduled text no longer count as proof of a published post.
 - Publish now defaults to consecutive uploads; batch scheduling explains spacing, timezone, target platforms and pause state. Existing destinations cannot be resubmitted accidentally from the batch dialog.
 - Connected account names are visible on the Videos page. Waiting jobs lead directly to account setup.
-- Local tests: 37 passed, including account-specific dispatch, preserved manual pause, expired-login preflight, and ambiguous publication outcomes. The ten-video dashboard test additionally checks immediate batch spacing, scheduled spacing, and duplicate-destination prevention.
+- Local tests: 38 passed, including account-specific dispatch, preserved manual pause, expired-login preflight, delayed page rendering, and ambiguous publication outcomes. The ten-video dashboard test additionally checks immediate batch spacing, scheduled spacing, and duplicate-destination prevention.
 - Fresh sign-in-page checks against all three destinations returned ERR_NETWORK_ACCESS_DENIED. No signed-in account or real publication has been verified. This restriction must be resolved in a permitted environment before a production release.
 
 ## Native build milestone

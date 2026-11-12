@@ -27,7 +27,7 @@ export class Browsers {
     await page.goto(destinations[platform],{waitUntil:'domcontentloaded',timeout:60000});await page.bringToFront();
     }catch(error){throw Error(browserError(error));}finally{this.busy=false;}
   }
-  async verify(profile,platform){
+  async verify(profile,platform,{wait=false}={}){
     const context=this.sessions.get(`${profile}-${platform}`);
     if(!context)throw Error('Open the sign-in browser and finish signing in first.');
     const page=context.pages()[0];
@@ -35,6 +35,11 @@ export class Browsers {
     const host=new URL(page.url()).hostname;
     if(!(host===new URL(destinations[platform]).hostname))throw Error('Finish signing in, then return to the platform.');
     const ready=platform==='youtube'?page.getByRole('button',{name:/^Create$/i}):platform==='instagram'?page.getByRole('link',{name:/^New post$|^Create$/i}):page.locator('input[type="file"]');
+    // Platform apps can render upload controls after DOMContentLoaded.
+    // A background upload must allow that render before declaring a login expired.
+    if(wait)await ready.first().waitFor({state:platform==='tiktok'?'attached':'visible',timeout:30000}).catch(()=>{
+      throw Error('The upload screen did not become ready. Check sign-in or verification prompts.');
+    });
     if(!await ready.count())throw Error('The signed-in upload screen could not be verified. Finish signing in or reopen the account browser.');
     if(platform!=='tiktok'&&!await ready.first().isVisible())throw Error('The signed-in upload screen is not ready.');
     return true;
@@ -61,7 +66,7 @@ export async function upload(browsers,job,video){
     const page=context.pages()[0]||await context.newPage();
     page.setDefaultTimeout(30000);
     await page.goto(destinations[job.platform],{waitUntil:'domcontentloaded',timeout:60000});
-    try{await browsers.verify(video.profile,job.platform);}catch(e){needsReconnect=true;throw e;}
+    try{await browsers.verify(video.profile,job.platform,{wait:true});}catch(e){needsReconnect=true;throw e;}
     const text=[video.title,video.description].filter(Boolean).join('\n\n');
     const commit=()=>{committing=true;};
     const url=await adapters[job.platform](page,video,text,commit);

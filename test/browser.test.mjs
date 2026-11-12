@@ -10,6 +10,14 @@ test('account verification requires a visible upload control',async()=>{
  b.sessions.set('p-youtube',{pages:()=>[{url:()=> 'https://studio.youtube.com/',getByRole:()=>locator}]});
  await assert.rejects(b.verify('p','youtube'),/not ready/);locator.isVisible=async()=>true;assert.equal(await b.verify('p','youtube'),true);
 });
+
+test('background verification waits for a delayed upload screen',async()=>{
+ const b=new Browsers('/unused');let rendered=false;
+ const locator={count:async()=>rendered?1:0,first(){return this;},isVisible:async()=>rendered,
+  waitFor:async options=>{assert.equal(options.state,'visible');rendered=true;}};
+ b.sessions.set('p-youtube',{pages:()=>[{url:()=> 'https://studio.youtube.com/',getByRole:()=>locator}]});
+ assert.equal(await b.verify('p','youtube',{wait:true}),true);
+});
 test('failed uploads become attention and release browser lock',async()=>{
  const b={busy:false,open:async()=>{throw Error('Browser unavailable');}};
  const result=await upload(b,{platform:'youtube'},{profile:'p'});assert.equal(result.state,'attention');assert.equal(b.busy,false);assert.match(result.message,/Browser unavailable/);
