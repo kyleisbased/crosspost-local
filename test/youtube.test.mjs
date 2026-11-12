@@ -15,10 +15,7 @@ async function fixture(t){
   const calls=[];let now=100000,opened;
   const yt=new YouTube(dir,{now:()=>now,openBrowser:async url=>{opened=url;},fetcher:async(url,options)=>{
     calls.push({url,options});
-    if(url.includes('/token')){
-      if(!new URLSearchParams(options.body).get('client_secret'))return json({error:'invalid_request',error_description:'client_secret is missing.'},{status:400});
-      return json({access_token:'fixture-access',refresh_token:'fixture-refresh',expires_in:3600,scope});
-    }
+    if(url.includes('/token'))return json({access_token:'fixture-access',refresh_token:'fixture-refresh',expires_in:3600,scope});
     if(url.includes('/channels'))return json({items:[{id:'UC-fixture',snippet:{title:'Test channel'}}]});
     throw Error('Unexpected request');
   }});
@@ -31,29 +28,20 @@ async function authorize(yt,profile='profile-1'){
   return {url,result:await yt.callback(new URLSearchParams({state:url.searchParams.get('state'),code:'fixture-code'}))};
 }
 
-test('fresh installations send the installed-app credential for both exchange and refresh',async t=>{
+test('fresh installations authorize and refresh using the bundled public client without a secret',async t=>{
   const f=await fixture(t);
   await rm(path.join(f.dir,'youtube','client.json'));
   await f.yt.init();
   const {url}=await authorize(f.yt);
   assert.equal(url.searchParams.get('client_id'),desktopClientId);
-  assert.ok(new URLSearchParams(f.calls[0].options.body).get('client_secret'));
+  assert.equal(new URLSearchParams(f.calls[0].options.body).has('client_secret'),false);
   f.now(9999999);await f.yt.accessToken('profile-1');
   const body=new URLSearchParams(f.calls.at(-1).options.body);
   assert.equal(body.get('client_id'),desktopClientId);
-  assert.ok(body.get('client_secret'));
+  assert.equal(body.has('client_secret'),false);
   await f.yt.configure(config);await f.yt.init();
   assert.equal(f.yt.config.client_id,config.installed.client_id);
   assert.equal(await f.yt.hasToken('profile-1'),false);
-});
-
-test('ID-only shared client settings are repaired while custom projects remain unchanged',async t=>{
-  const f=await fixture(t);
-  await writeFile(path.join(f.dir,'youtube','client.json'),JSON.stringify({client_id:desktopClientId}));
-  await f.yt.init();await authorize(f.yt);
-  assert.ok(new URLSearchParams(f.calls[0].options.body).get('client_secret'));
-  await f.yt.configure(config);await f.yt.init();
-  assert.equal(f.yt.config.client_secret,'fixture-only');
 });
 test('Google login opens normal browser with PKCE and callback verifies channel identity',async t=>{
   const f=await fixture(t),{url,result}=await authorize(f.yt);
