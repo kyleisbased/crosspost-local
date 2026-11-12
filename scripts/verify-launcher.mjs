@@ -41,7 +41,6 @@ export async function verifyLauncher(command,args=[]){
     const reopened=await(await request('/api/state')).json();
     assert.equal(reopened.token,state.token,'A second launch must reuse the running server');
     assert.ok(reopened.profiles.some(item=>item.id===profile.id));
-    console.log('Launcher passed: starts isolated app, reopens same instance, and retains saved data.');
   }finally{
     // Also recover a server that started just before a launcher failure.
     const health=await request('/api/health').then(r=>r.json()).catch(()=>null);
@@ -56,7 +55,10 @@ export async function verifyLauncher(command,args=[]){
         if(!alive){stopped=true;break;}
       }
     }else stopped=!health;
-    if(stopped)await rm(data,{recursive:true,force:true});
+    // A closed listener can precede SQLite/process handle release on Windows.
+    // Bound the cleanup wait; do not treat a permanently locked database as success.
+    if(stopped)await rm(data,{recursive:true,force:true,maxRetries:20,retryDelay:50});
     if(ownsServer&&!stopped)throw Error('Launcher test could not stop its isolated server.');
   }
+  console.log('Launcher passed: starts isolated app, reopens same instance, retains saved data, and shuts down cleanly.');
 }
