@@ -4,15 +4,15 @@ Crosspost 0.2 uses the normal system browser and Google's Desktop OAuth flow. Go
 
 ## Connect your channel
 
-Crosspost 0.2.1 includes the public ID of the Crosspost Local Desktop OAuth client. Open Accounts, click Connect for YouTube, and choose Sign in. Google opens in your normal browser. Choose your own Google account and channel, allow upload and channel-read permissions, then return to Crosspost.
+Crosspost 0.2.2 includes the registered Crosspost Local Desktop OAuth credentials. Open Accounts, click Connect for YouTube, and choose Sign in. Google opens in your normal browser. Choose your own Google account and channel, allow upload and channel-read permissions, then return to Crosspost.
 
-No developer JSON is needed with the included client. No client secret or personal tokens are included in releases. The app uses PKCE and a loopback callback; Google's Desktop OAuth documentation lists the client secret as optional for code exchange and refresh.
+No developer JSON is needed with the included client. Google requires this desktop client's client_secret during code exchange and refresh. Version 0.2.1 omitted it, producing HTTP 400 (invalid_request: client_secret is missing). Version 0.2.2 includes the installed-app credential and repairs ID-only settings for this client. Desktop credentials cannot be kept confidential in distributed software; PKCE and per-request state remain enabled. Personal access and refresh tokens are never included in releases.
 
 ## Current Google access
 
 As of November 12, 2026, the shared Crosspost Local project is External / In production, without Google verification. YouTube Data API v3 is enabled. Individual tester invitations are no longer required. The Google API User Data Policy and YouTube API terms have been accepted.
 
-Google's unverified-app warning is expected. The project is limited to 100 users over its lifetime; publishing does not remove that cap or override Google account and organization restrictions. This publishing change applies to the included client in version 0.2.1 without another app download. Older packaged help may still refer to tester invitations; this page supersedes that guidance for the shared client.
+Google's unverified-app warning is expected. The project is limited to 100 users over its lifetime; publishing does not remove that cap or override Google account and organization restrictions. This publishing change applies to the included client in version 0.2.1 without another app download, but the separate credential bug requires updating to 0.2.2. Older packaged help may still refer to tester invitations; this page supersedes that guidance for the shared client.
 
 The maintainer intends this unverified release for a small personally known group. A successful real-account sign-in and upload are still required before calling the integration verified. The managed development session previously denied access to Google's token endpoint, so its simulated tests do not prove a real connection.
 
@@ -37,3 +37,4 @@ The app opens accounts.google.com in your normal browser using a random, short-l
 Reference: [Google Desktop OAuth](https://developers.google.com/identity/protocols/oauth2/native-app), [YouTube upload API](https://developers.google.com/youtube/v3/docs/videos/insert).
 
 Automated tests use simulated Google responses. A real sign-in and public upload remain required before calling this production-ready.
+
