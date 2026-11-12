@@ -4,7 +4,7 @@ import path from 'node:path';
 export const destinations={youtube:'https://studio.youtube.com/',instagram:'https://www.instagram.com/',tiktok:'https://www.tiktok.com/tiktokstudio/upload'};
 export function browserError(error){
   const message=String(error?.message||error);
-  if(message.includes('ERR_NETWORK_ACCESS_DENIED'))return 'This computer or execution environment blocked the browser’s internet access. Account sign-in and publishing need network access. No connection was saved.';
+  if(message.includes('ERR_NETWORK_ACCESS_DENIED'))return 'This computer or execution environment blocked the browser's internet access. Account sign-in and publishing need network access. No connection was saved.';
   if(/Executable doesn't exist|browserType\.launch.*executable/i.test(message))return 'The included browser is missing. Re-extract the complete app package, or run Setup if using the source version.';
   return message.replace(/\u001b\[[0-9;]*m/g,'').split('\n')[0].slice(0,350);
 }
@@ -40,6 +40,10 @@ export class Browsers {
     return true;
   }
   async closeAll(){for(const context of this.sessions.values())await context.close().catch(()=>{});}
+  async close(profile,platform){
+    const key=`${profile}-${platform}`,context=this.sessions.get(key);
+    if(context){await context.close();this.sessions.delete(key);}
+  }
 }
 
 // Selectors below target the English desktop publishing interfaces. They are
@@ -51,20 +55,25 @@ async function caption(page,locator,text){await fill(locator,text);}
 
 export async function upload(browsers,job,video){
   browsers.busy=true;
-  let context,committing=false;
+  let context,committing=false,needsReconnect=false;
   try{
     context=await browsers.open(video.profile,job.platform);
     const page=context.pages()[0]||await context.newPage();
     page.setDefaultTimeout(30000);
     await page.goto(destinations[job.platform],{waitUntil:'domcontentloaded',timeout:60000});
+    try{await browsers.verify(video.profile,job.platform);}catch(e){needsReconnect=true;throw e;}
     const text=[video.title,video.description].filter(Boolean).join('\n\n');
     const commit=()=>{committing=true;};
     const url=await adapters[job.platform](page,video,text,commit);
     return {state:'published',message:'Publication confirmation detected in the platform browser.',url};
   }catch(e){
     const note=committing?'The final publish step started. Check the platform before retrying to avoid a duplicate.':'The browser could not complete the upload. Check login, verification prompts, and the draft before retrying.';
-    return {state:'attention',message:`${note} ${browserError(e)}`,url:null};
-  }finally{browsers.busy=false;}
+    return {state:'attention',message:`${note} ${browserError(e)}`,url:null,needsReconnect};
+  }finally{
+    // Release browser memory after each upload. Saved sign-in data stays on disk.
+    if(context)await browsers.close(video.profile,job.platform).catch(()=>{});
+    browsers.busy=false;
+  }
 }
 
 const adapters={
@@ -79,7 +88,7 @@ const adapters={
     for(let n=0;n<3;n++)await click(page.getByRole('button',{name:'Next',exact:true}));
     await click(page.getByRole('radio',{name:/^Public/}));
     commit();await click(page.getByRole('button',{name:'Publish',exact:true}));
-    await success(page,/Video published|Video scheduled/i);
+    await success(page,/^Video published[.!]?$/i);
     const link=await page.locator('a[href*="youtu.be/"]').first().getAttribute('href').catch(()=>null);
     return link;
   },
@@ -93,7 +102,7 @@ const adapters={
     await click(page.getByRole('button',{name:'Next',exact:true}));
     await caption(page,page.getByRole('textbox',{name:/Write a caption/i}),text);
     commit();await click(page.getByRole('button',{name:'Share',exact:true}));
-    await success(page,/Your reel has been shared|Your post has been shared/i);
+    await success(page,/^Your (?:reel|post) has been shared[.!]?$/i);
     return null;
   },
   async tiktok(page,video,text,commit){
@@ -102,7 +111,8 @@ const adapters={
     // A previously saved privacy choice may not be public; require visible Everyone.
     await page.getByText('Everyone',{exact:true}).first().waitFor({state:'visible',timeout:30000});
     commit();await click(page.getByRole('button',{name:'Post',exact:true}));
-    await success(page,/Your video has been uploaded|Your video has been posted|Video uploaded/i);
+    // Upload completion alone does not establish that a video was published.
+    await success(page,/^(?:Your video has been posted|Video posted|Your video has been published|Video published)(?: successfully)?[.!]?$/i);
     return null;
   }
 };

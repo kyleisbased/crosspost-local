@@ -22,25 +22,29 @@ export class Store {
     return {id,name};
   }
   profile(id) { const p=this.db.prepare('SELECT * FROM profiles WHERE id=?').get(id); if(!p) throw Error('Profile not found.'); return p; }
+  disconnect(profile,platform) {
+    this.profile(profile);if(!platforms.includes(platform))throw Error('Unknown platform.');
+    this.db.prepare('UPDATE accounts SET confirmed=0 WHERE profile=? AND platform=?').run(profile,platform);
+  }
   video(id) { const v=this.db.prepare('SELECT * FROM videos WHERE id=?').get(id); if(!v) throw Error('Video not found.'); return {...v,metadata:JSON.parse(v.metadata)}; }
   addVideo(v) { this.profile(v.profile);const id=randomUUID(); this.db.prepare('INSERT INTO videos VALUES(?,?,?,?,?,?,?,?)').run(id,v.profile,v.name,v.path,v.title,'',JSON.stringify(v.metadata),Date.now());return this.video(id); }
   editVideo(id,title,description) {
     if(typeof title!=='string'||typeof description!=='string')throw Error('Title and description must be text.');
     this.video(id);
     if (this.db.prepare("SELECT id FROM jobs WHERE video=? AND state IN ('queued','running')").get(id)) throw Error('Cancel pending uploads before editing this video.');
-    if(!String(title).trim() || String(title).length>100) throw Error('Title must be 1–100 characters.');
+    if(!String(title).trim() || String(title).length>100) throw Error('Title must be 1-100 characters.');
     if(String(description).length>2000) throw Error('Shared description must be 2,000 characters or fewer.');
     this.db.prepare('UPDATE videos SET title=?,description=? WHERE id=?').run(String(title).trim(),String(description),id);
   }
   bulkCaption(ids,description){
-    if(!Array.isArray(ids)||!ids.length||ids.length>100||new Set(ids).size!==ids.length)throw Error('Select 1–100 unique videos.');
+    if(!Array.isArray(ids)||!ids.length||ids.length>100||new Set(ids).size!==ids.length)throw Error('Select 1-100 unique videos.');
     const list=ids.map(id=>this.video(id));
     if(new Set(list.map(v=>v.profile)).size!==1)throw Error('Edit one profile at a time.');
     this.db.exec('BEGIN IMMEDIATE');
     try{for(const v of list)this.editVideo(v.id,v.title,description);this.db.exec('COMMIT');}catch(e){this.db.exec('ROLLBACK');throw e;}
   }
   queue(ids,targets,start,interval) {
-    if(!Array.isArray(ids)||!ids.length||ids.length>100) throw Error('Select 1–100 videos.');
+    if(!Array.isArray(ids)||!ids.length||ids.length>100) throw Error('Select 1-100 videos.');
     if(!Array.isArray(targets)||!targets.length||targets.some(p=>!platforms.includes(p))) throw Error('Select a valid platform.');
     if(new Set(ids).size!==ids.length||new Set(targets).size!==targets.length) throw Error('Duplicate selections.');
     if(!Number.isFinite(start)||!Number.isFinite(interval)||interval<0||interval>31536000000) throw Error('Invalid schedule.');
@@ -62,7 +66,7 @@ export class Store {
     if(this.paused())return null;
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const j=this.db.prepare("SELECT jobs.*,videos.profile FROM jobs JOIN videos ON jobs.video=videos.id WHERE state='queued' AND due<=? ORDER BY due,updated LIMIT 1").get(now);
+      const j=this.db.prepare("SELECT jobs.*,videos.profile FROM jobs JOIN videos ON jobs.video=videos.id JOIN accounts ON accounts.profile=videos.profile AND accounts.platform=jobs.platform WHERE jobs.state='queued' AND jobs.due<=? AND accounts.confirmed=1 ORDER BY jobs.due,jobs.updated LIMIT 1").get(now);
       if(j) this.db.prepare("UPDATE jobs SET state='running',updated=? WHERE id=?").run(now,j.id);
       this.db.exec('COMMIT');return j;
     }catch(e){this.db.exec('ROLLBACK');throw e;}

@@ -12,10 +12,9 @@ import { inspectVideo } from './media.mjs';
 import { dataIdentity } from './identity.mjs';
 
 const appRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-export async function createApp({dataDir=process.env.CROSSPOST_DATA||path.join(appRoot,'data'),port=Number(process.env.PORT||4318),worker=true}={}){
+export async function createApp({dataDir=process.env.CROSSPOST_DATA||path.join(appRoot,'data'),port=Number(process.env.PORT||4318),worker=true,browsers=new Browsers(path.join(dataDir,'sessions'))}={}){
   await mkdir(path.join(dataDir,'videos'),{recursive:true,mode:0o700});
   const store=new Store(path.join(dataDir,'crosspost.sqlite'),false);
-  const browsers=new Browsers(path.join(dataDir,'sessions'));
   const token=randomBytes(32).toString('hex');let working=false,closing=false;
   const send=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(data));};
   const json=async req=>{let result='';for await(const c of req){result+=c;if(result.length>1024*1024)throw Error('Request too large.');}return JSON.parse(result||'{}');};
@@ -37,8 +36,10 @@ export async function createApp({dataDir=process.env.CROSSPOST_DATA||path.join(a
       if(req.method==='POST'&&route==='/api/connect'){
         const b=await json(req);store.profile(b.profile);if(!platforms.includes(b.platform))throw Error('Unknown platform.');
         if(browsers.busy)throw Error('Wait for the current upload to finish.');
-        const previouslyPaused=store.paused();store.pause(true);
-        try{await browsers.connect(b.profile,b.platform);}catch(e){store.pause(previouslyPaused);throw e;}return send(res,200,{ok:true});
+        // Suspend only this account, durably, until the user verifies it again.
+        // Never change the user's global pause preference during account setup.
+        store.disconnect(b.profile,b.platform);
+        await browsers.connect(b.profile,b.platform);return send(res,200,{ok:true});
       }
       if(req.method==='POST'&&route==='/api/quit'){
         if(working||browsers.busy)throw Error('Wait for the current upload to finish before quitting.');
@@ -50,8 +51,13 @@ export async function createApp({dataDir=process.env.CROSSPOST_DATA||path.join(a
         if(browsers.busy)throw Error('Wait for the current upload to finish.');
         const label=String(b.label||'').trim();if(!label||label.length>100)throw Error('Enter the account handle you signed into.');
         if(!b.confirmed)throw Error('Confirm that you signed into the correct account.');
-        await browsers.verify(b.profile,b.platform);
-        store.db.prepare('UPDATE accounts SET label=?,confirmed=1 WHERE profile=? AND platform=?').run(label,b.profile,b.platform);
+        browsers.busy=true;
+        try{
+          await browsers.verify(b.profile,b.platform);
+          // Close the setup window before allowing this account's jobs to run.
+          await browsers.close(b.profile,b.platform);
+          store.db.prepare('UPDATE accounts SET label=?,confirmed=1 WHERE profile=? AND platform=?').run(label,b.profile,b.platform);
+        }finally{browsers.busy=false;}
         return send(res,200,{ok:true});
       }
       if(req.method==='POST'&&route==='/api/upload'){
@@ -93,7 +99,7 @@ export async function createApp({dataDir=process.env.CROSSPOST_DATA||path.join(a
   store.recover();
   const tick=async()=>{
     if(working||closing||browsers.busy)return;working=true;
-    try{const job=store.claim();if(job){const result=await upload(browsers,job,store.video(job.video));store.finish(job.id,result.state,result.message,result.url);}}
+    try{const job=store.claim();if(job){const result=await upload(browsers,job,store.video(job.video));if(result.needsReconnect)store.disconnect(job.profile,job.platform);store.finish(job.id,result.state,result.message,result.url);}}
     catch(e){console.error('Worker:',e.message);}finally{working=false;}
   };
   const timer=worker?setInterval(tick,3000):null;

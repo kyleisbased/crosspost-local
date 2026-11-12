@@ -20,7 +20,33 @@ test('simultaneous connection requests are rejected and lock is released',async(
 test('network denial is actionable and never marks a connection successful',async()=>{
  const b=new Browsers('/unused');
  b.open=async()=>({pages:()=>[{goto:async()=>{throw Error('page.goto: net::ERR_NETWORK_ACCESS_DENIED\nCall log: private debugging details');}}]});
- await assert.rejects(b.connect('p','youtube'),/blocked the browser’s internet access/);
+ await assert.rejects(b.connect('p','youtube'),/blocked the browser's internet access/);
  assert.equal(b.busy,false);
  assert.doesNotMatch(browserError(Error('net::ERR_NETWORK_ACCESS_DENIED\nCall log: secret')),/secret|Call log/);
+});
+
+function uploadFixture(message,{signedIn=true}={}){
+  let closed=0,files=0,clicks=0;
+  const control={first(){return this;},fill:async()=>{},click:async()=>{clicks++;},setInputFiles:async()=>{files++;},waitFor:async()=>{}};
+  const page={setDefaultTimeout(){},goto:async()=>{},locator:()=>control,getByRole:()=>control,
+    getByText(pattern){if(typeof pattern==='string')return control;return {first(){return this;},waitFor:async()=>{if(!pattern.test(message))throw Error('Publication not confirmed');}};}};
+  const browsers={busy:false,open:async()=>({pages:()=>[page]}),verify:async()=>{if(!signedIn)throw Error('Finish signing in');},close:async()=>{closed++;}};
+  return {browsers,counts:()=>({closed,files,clicks})};
+}
+
+test('TikTok upload completion is not reported as publication',async()=>{
+  for(const message of ['Video uploaded','Your video has been uploaded','Your video has been posted to drafts']){
+    const f=uploadFixture(message),r=await upload(f.browsers,{platform:'tiktok'},{profile:'p',path:'/clip.mp4',title:'Test',description:''});
+    assert.equal(r.state,'attention');assert.match(r.message,/final publish step started/);assert.equal(f.counts().closed,1);assert.equal(f.browsers.busy,false);
+  }
+});
+
+test('explicit publication confirmation succeeds and closes the browser',async()=>{
+  const f=uploadFixture('Your video has been posted.'),r=await upload(f.browsers,{platform:'tiktok'},{profile:'p',path:'/clip.mp4',title:'Test',description:''});
+  assert.equal(r.state,'published');assert.equal(f.counts().closed,1);
+});
+
+test('expired login is detected before selecting a file or pressing publish',async()=>{
+  const f=uploadFixture('',{signedIn:false}),r=await upload(f.browsers,{platform:'tiktok'},{profile:'p',path:'/clip.mp4',title:'Test',description:''});
+  assert.equal(r.state,'attention');assert.equal(r.needsReconnect,true);assert.deepEqual(f.counts(),{closed:1,files:0,clicks:0});
 });

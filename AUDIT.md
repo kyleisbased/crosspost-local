@@ -2,6 +2,17 @@
 
 Release decision: NOT ready for unattended production publishing.
 
+## Latest source fixes (November 11, 2026, Central time)
+
+- Account setup no longer pauses all profiles and platforms. It clears only the selected account's readiness; the durable scheduler skips that account until verification succeeds, including across restarts.
+- Verification closes the setup browser before restoring readiness. Each upload checks session readiness before selecting a file, and expired sessions hold remaining jobs for that account.
+- Upload windows close after attempts to limit accumulated browser processes. Ambiguous final outcomes remain Needs attention; they are never automatically retried.
+- Generic TikTok upload-complete text and YouTube scheduled text no longer count as proof of a published post.
+- Publish now defaults to consecutive uploads; batch scheduling explains spacing, timezone, target platforms and pause state. Existing destinations cannot be resubmitted accidentally from the batch dialog.
+- Connected account names are visible on the Videos page. Waiting jobs lead directly to account setup.
+- Local tests: 37 passed, including account-specific dispatch, preserved manual pause, expired-login preflight, and ambiguous publication outcomes. The ten-video dashboard test additionally checks immediate batch spacing, scheduled spacing, and duplicate-destination prevention.
+- Fresh sign-in-page checks against all three destinations returned ERR_NETWORK_ACCESS_DENIED. No signed-in account or real publication has been verified. This restriction must be resolved in a permitted environment before a production release.
+
 ## Native build milestone
 
 The private repository is https://github.com/kyleisbased/crosspost-local. Native build run https://github.com/kyleisbased/crosspost-local/actions/runs/43129620724 succeeded for Windows x64, macOS Intel, and macOS Apple Silicon on commit `3d5fb175cdc8ebaf118dcb4e95afaab99c2a7671`. Each platform passed all 32 automated tests, the real ten-video dashboard test, the bundled Node/SQLite/server/Chromium smoke test, and an actual-launcher test. Three ZIP artifacts were produced. These checks do not test real platform sign-in, actual posting, or OS download approval.

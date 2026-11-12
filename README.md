@@ -1,5 +1,13 @@
 # Crosspost Local - early access 0.1
 
+## Latest publishing reliability fixes
+
+Account setup now holds only the selected account's jobs. Other connected accounts keep working, and an explicit queue pause stays paused. Successful verification closes the setup browser and releases that account's waiting jobs. If setup fails or is abandoned, those jobs remain queued until the account is verified. Before each upload, the app checks the signed-in upload screen again; an expired login holds that account's remaining jobs. Browser windows close after each attempted upload to release memory.
+
+Publish now defaults to uploading the selected batch consecutively. Scheduled batches show their spacing and timezone before submission. The dashboard shows connected account names, prevents reselecting destinations with existing uploads, and explains when a queued job is waiting for its account. Publication confirmation no longer accepts TikTok's generic upload-complete message or YouTube's scheduled message as proof of publication.
+
+Local validation: 37 automated tests plus the ten-video dashboard test. These fixes still require real platform validation; all three publishing-browser sign-in pages returned ERR_NETWORK_ACCESS_DENIED in this execution environment on November 11, 2026 (Central time). Do not treat local tests as proof of unattended social publishing.
+
 ## Self-contained distribution (test builds)
 
 [Download the private desktop test release](https://github.com/kyleisbased/crosspost-local/releases/tag/v0.1.0-test-43129620724). Choose Windows, Mac Apple Silicon, or Mac Intel, extract the whole ZIP, then open Crosspost.exe or Crosspost.app. You can give the downloaded ZIP to a friend; they do not need GitHub or separately installed developer tools to run it. These unsigned packages still need recipient-machine and live-account testing.
@@ -47,7 +55,7 @@ Each new package includes `PACKAGE-MANIFEST.json` with hashes for its files. The
 
 ## Connect profiles
 
-Create a profile at the top, such as Personal or My channel. Connect each platform: open its browser, sign in yourself, finish any verification, then save the account name in the dashboard. Each platform in each profile gets a separate browser directory. These are not your existing everyday browser sessions.
+Create a profile at the top, such as Personal or My channel. Connect each platform: open its browser, sign in yourself, finish any verification, then save the account name in the dashboard. Verification closes the setup browser and allows that account's waiting jobs to run unless the queue is paused. Each platform in each profile gets a separate browser directory. These are not your existing everyday browser sessions.
 
 The label is user-confirmed, not an API-verified identity. Always check the actual account in the browser before the first post. Do not switch the active account inside a connected profile's browser; create a different profile instead. A rejected automated-browser login is an unresolved platform limitation, not something this app works around.
 

@@ -1,7 +1,7 @@
 const $=s=>document.querySelector(s);
 let stopped=false;
 let state,active=localStorage.getItem('crosspost.profile'),view='library',selected=new Set(),toastTimer;
-const names={youtube:'YouTube',instagram:'Instagram',tiktok:'TikTok'},symbols={youtube:'▶',instagram:'◎',tiktok:'♪'};
+const names={youtube:'YouTube',instagram:'Instagram',tiktok:'TikTok'},symbols={youtube:'?',instagram:'?',tiktok:''};
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;}
 function toast(message){(document.querySelector('dialog[open]')||document.body).append($('#toast'));$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,6500);}
 async function api(url,body,method='POST'){const r=await fetch(url,{method,headers:{'Content-Type':'application/json','X-Crosspost-Token':state.token},body:JSON.stringify(body)});const result=await r.json();if(!r.ok)throw Error(result.error);return result;}
@@ -16,7 +16,7 @@ function platformIcon(p){return el('span',`platform ${p}`,symbols[p]);}
 function render(){
   $('#profile').replaceChildren(...state.profiles.map(p=>{const o=el('option','',p.name);o.value=p.id;return o;}));$('#profile').value=active;
   $('#pause').textContent=state.paused?'Resume queue':'Pause queue'; $('#pausedAlert').hidden=!state.paused;
-  const vs=videos();selected=new Set([...selected].filter(id=>vs.some(v=>v.id===id)));$('#videoCount').textContent=vs.length; const connected=Object.keys(names).filter(p=>account(p).confirmed); $('#connectionSummary').textContent=connected.length?connected.map(p=>names[p]).join(' + '):'Connect your accounts to start posting.'; $('#manageAccounts').textContent=connected.length?'Manage accounts':'Set up accounts';
+  const vs=videos();selected=new Set([...selected].filter(id=>vs.some(v=>v.id===id)));$('#videoCount').textContent=vs.length; const connected=Object.keys(names).filter(p=>account(p).confirmed); $('#connectionSummary').textContent=connected.length?connected.map(p=>`${names[p]}: ${account(p).label}`).join(' � '):'Connect your accounts to start posting.'; $('#manageAccounts').textContent=connected.length?'Manage accounts':'Set up accounts';
   $('#queueCount').textContent=profileJobs().filter(j=>j.state==='queued'||j.state==='running').length;
   $('#timezone').textContent=`Times shown in ${Intl.DateTimeFormat().resolvedOptions().timeZone}`;
   for(const target of ['#accountStrip','#accountSettings']){
@@ -27,10 +27,13 @@ function render(){
   if($('#videos').dataset.signature!==signature){$('#videos').dataset.signature=signature;renderVideos(vs);}
   $('#selectAll').checked=!!vs.length&&selected.size===vs.length;$('#schedule').disabled=!selected.size;$('#bulkCaption').disabled=!selected.size; $('#bulkCaption').hidden=!selected.size; $('#schedule').textContent=selected.size?'Continue ('+selected.size+')':'Continue';
   $('#jobs').replaceChildren(...profileJobs().map(j=>{
-    const v=vs.find(v=>v.id===j.video),row=el('article','job');row.append(platformIcon(j.platform));const info=el('div','job-info');info.append(el('strong','',v.title),el('p','',`${names[j.platform]} · ${new Date(j.due).toLocaleString()}`),el('span',`status ${j.state}`,j.state));if(j.message)info.append(el('p','',j.message));if(j.url){const a=el('a','text-btn','View post ↗');a.href=j.url;a.target='_blank';a.rel='noopener noreferrer';info.append(a);}row.append(info);const actions=el('div','job-actions');
-    if(j.state==='queued')actions.append(button('Cancel','secondary',async()=>{await api(`/api/jobs/${j.id}`,{action:'cancel'});await refresh();}));
+    const v=vs.find(v=>v.id===j.video),row=el('article','job');row.append(platformIcon(j.platform));const info=el('div','job-info');info.append(el('strong','',v.title),el('p','',`${names[j.platform]} � ${new Date(j.due).toLocaleString()}`),el('span',`status ${j.state}`,j.state));if(j.message)info.append(el('p','',j.message));if(j.url){const a=el('a','text-btn','View post ?');a.href=j.url;a.target='_blank';a.rel='noopener noreferrer';info.append(a);}row.append(info);const actions=el('div','job-actions');
+    if(j.state==='queued'){
+      if(!account(j.platform).confirmed){info.append(el('p','','Waiting for account connection.'));actions.append(button('Connect','secondary',()=>connect(j.platform)));}
+      actions.append(button('Cancel','secondary',async()=>{await api(`/api/jobs/${j.id}`,{action:'cancel'});await refresh();}));
+    }
     if(j.state==='attention'){
-      actions.append(button('Open account','secondary',()=>api('/api/connect',{profile:active,platform:j.platform})));
+      actions.append(button('Check account','secondary',()=>connect(j.platform)));
       actions.append(button('Retry','secondary',async()=>{if(await ask('Check this platform first. Confirm the video was NOT published and discard any duplicate draft. Retry this upload?')){await api(`/api/jobs/${j.id}`,{action:'retry',checked:true});await refresh();}}));
       actions.append(button('Mark published','secondary',async()=>{if(await ask('Have you checked that this exact video is published on this account?')){await api(`/api/jobs/${j.id}`,{action:'complete',checked:true});await refresh();}}));
     }row.append(actions);return row;
@@ -38,7 +41,7 @@ function render(){
 }
 function empty(title,body){const d=el('div','empty');d.append(el('strong','',title),el('p','',body));return d;}
 function renderVideos(vs){
-  $('#videos').replaceChildren(...vs.map(v=>{const card=el('article','video-card'),preview=el('div','video-preview'),check=el('input');check.type='checkbox';check.checked=selected.has(v.id);check.setAttribute('aria-label',`Select ${v.title}`);check.onchange=()=>{check.checked?selected.add(v.id):selected.delete(v.id);render();};const video=el('video');video.src=`/media/${v.id}`;video.preload='metadata';video.controls=true;preview.append(check,video,el('span','duration',`${Math.floor(v.metadata.duration/60)}:${String(Math.floor(v.metadata.duration%60)).padStart(2,'0')}`));const body=el('div','video-body');body.append(el('h3','',v.title),el('p','',`${v.metadata.width} × ${v.metadata.height} · ${v.metadata.madeForKids?'Made for kids':'Not made for kids'}`));const actions=el('div','video-actions'),jobs=state.jobs.filter(j=>j.video===v.id);actions.append(el('span',`status ${jobs[0]?.state||''}`,jobs.length?`${jobs.length} destination${jobs.length===1?'':'s'}`:'Ready to plan'),button('Edit','text-btn',()=>edit(v)));body.append(actions);card.append(preview,body);return card;}));
+  $('#videos').replaceChildren(...vs.map(v=>{const card=el('article','video-card'),preview=el('div','video-preview'),check=el('input');check.type='checkbox';check.checked=selected.has(v.id);check.setAttribute('aria-label',`Select ${v.title}`);check.onchange=()=>{check.checked?selected.add(v.id):selected.delete(v.id);render();};const video=el('video');video.src=`/media/${v.id}`;video.preload='metadata';video.controls=true;preview.append(check,video,el('span','duration',`${Math.floor(v.metadata.duration/60)}:${String(Math.floor(v.metadata.duration%60)).padStart(2,'0')}`));const body=el('div','video-body');body.append(el('h3','',v.title),el('p','',`${v.metadata.width} x ${v.metadata.height} � ${v.metadata.madeForKids?'Made for kids':'Not made for kids'}`));const actions=el('div','video-actions'),jobs=state.jobs.filter(j=>j.video===v.id);actions.append(el('span',`status ${jobs[0]?.state||''}`,jobs.length?`${jobs.length} destination${jobs.length===1?'':'s'}`:'Ready to plan'),button('Edit','text-btn',()=>edit(v)));body.append(actions);card.append(preview,body);return card;}));
   if(!vs.length)$('#videos').append(empty('No videos yet.','Add your first video above.'));
 }
 function setView(next){view=next;const labels={library:['Videos','Your videos','Add videos, select them, then publish or schedule.'],queue:['Queue','Your queue','See what is scheduled and what has been posted.'],accounts:['Accounts','Your accounts','Choose where your videos will be posted.']};$('#viewName').textContent=labels[view][0];$('#heading').textContent=labels[view][1];$('#subtitle').textContent=labels[view][2];for(const name of Object.keys(labels))$(`#${name}View`).hidden=name!==view;document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.view===view));}
@@ -46,7 +49,7 @@ function edit(v){$('#editId').value=v.id;$('#editTitle').value=v.title;$('#editD
 const removeDraft=button('Remove this draft','text-btn',async()=>{if(await ask('Remove this local draft and its imported video copy? Your original file is not affected.')){await api(`/api/videos/${$('#editId').value}`,{},'DELETE');$('#editor').close();await refresh();}});$('#editForm').append(removeDraft);
 function connect(p){$('#connectPlatform').value=p;$('#accountLabel').value=account(p).label;$('#signedIn').checked=false;$('#connectHelp').textContent=`Open ${names[p]}, sign in normally, and complete any verification. Leave the correct account active. Keep the browser open until you verify the connection.`;$('#connectDialog').showModal();}
 async function importFiles(files){
-  const importedProfile=active;$('#files').disabled=true;$('#importStatus').textContent=`Importing ${files.length} video${files.length===1?'':'s'}…`;const errors=[];
+  const importedProfile=active;$('#files').disabled=true;$('#importStatus').textContent=`Importing ${files.length} video${files.length===1?'':'s'}.`;const errors=[];
   try{for(const [i,file] of [...files].entries()){ $('#importStatus').textContent=`Importing ${i+1} of ${files.length}: ${file.name}`;try{const r=await fetch(`/api/upload?profile=${importedProfile}&name=${encodeURIComponent(file.name)}`,{method:'POST',headers:{'X-Crosspost-Token':state.token,'Content-Type':'video/mp4'},body:file});const result=await r.json();if(!r.ok)throw Error(result.error);if(active===importedProfile)selected.add(result.id);}catch(e){errors.push(`${file.name}: ${e.message}`);}}
     $('#importStatus').textContent=errors.join('\n');await refresh();toast(errors.length?'Import finished. Review the file messages.':'Your videos are ready.');
   }finally{$('#files').disabled=false;$('#files').value='';}
@@ -59,14 +62,46 @@ $('#quit').onclick=guard(async()=>{if(await ask('Pause the queue and quit the lo
 $('#profile').onchange=()=>{active=$('#profile').value;localStorage.setItem('crosspost.profile',active);selected.clear();$('#videos').dataset.signature='';render();};
 $('#addProfile').onclick=guard(async()=>{const name=await ask('Name this profile (for example, My channel or Personal):',true);if(!name)return;const p=await api('/api/profiles',{name});active=p.id;localStorage.setItem('crosspost.profile',active);selected.clear();await refresh();setView('accounts');});
 $('#pause').onclick=guard(async()=>{await api('/api/pause',{paused:!state.paused});await refresh();toast(state.paused?'Queue paused. An active upload will finish.':'Queue resumed.');});
-$('#openBrowser').onclick=guard(async()=>{const b=$('#openBrowser');b.disabled=true;b.textContent='Opening browser…';try{await api('/api/connect',{profile:active,platform:$('#connectPlatform').value});toast('Sign in, then verify the connection here. Queue paused during setup.'); await refresh();}finally{b.disabled=false;b.textContent='Sign in ↗';}});
-$('#connectForm').onsubmit=guard(async e=>{e.preventDefault();await api('/api/account',{profile:active,platform:$('#connectPlatform').value,label:$('#accountLabel').value,confirmed:$('#signedIn').checked});$('#connectDialog').close();await refresh();toast('Sign-in screen verified. Resume the queue when ready.');});
+$('#openBrowser').onclick=guard(async()=>{const b=$('#openBrowser');b.disabled=true;b.textContent='Opening browser.';try{await api('/api/connect',{profile:active,platform:$('#connectPlatform').value});toast('Sign in, then verify here. Only this account waits during setup.');}finally{b.disabled=false;b.textContent='Sign in ?';await refresh();}});
+$('#connectForm').onsubmit=guard(async e=>{e.preventDefault();const b=$('#connectForm button[type=submit]');b.disabled=true;try{await api('/api/account',{profile:active,platform:$('#connectPlatform').value,label:$('#accountLabel').value,confirmed:$('#signedIn').checked});$('#connectDialog').close();await refresh();toast(state.paused?'Account connected. Your queue is still paused.':'Account connected. Ready to publish.');}finally{b.disabled=false;}});
 $('#editForm').onsubmit=guard(async e=>{e.preventDefault();await api(`/api/videos/${$('#editId').value}`,{title:$('#editTitle').value,description:$('#editDescription').value,madeForKids:$('#editKids').checked},'PATCH');$('#editor').close();await refresh();toast('Video details saved.');});
 $('#files').onchange=guard(e=>importFiles([...e.target.files]));
 $('#dropzone').ondragover=e=>{e.preventDefault();$('#dropzone').classList.add('drag');};$('#dropzone').ondragleave=()=>$('#dropzone').classList.remove('drag');$('#dropzone').ondrop=guard(async e=>{e.preventDefault();$('#dropzone').classList.remove('drag');if(!$('#files').disabled)await importFiles([...e.dataTransfer.files]);});
 $('#selectAll').onchange=()=>{selected=$('#selectAll').checked?new Set(videos().map(v=>v.id)):new Set();$('#videos').dataset.signature='';render();};
 $('#bulkCaption').onclick=guard(async()=>{const description=await ask('Apply this description to all selected videos. Individual titles will stay the same.',true);if(description===null)return;await api('/api/bulk-caption',{ids:videos().filter(v=>selected.has(v.id)).map(v=>v.id),description});await refresh();toast('Descriptions updated.');});
-$('#schedule').onclick=()=>{ $('#interval').closest('label').hidden=selected.size<2;$('#scheduleSummary').textContent=`${selected.size} video${selected.size===1?'':'s'} · ${state.profiles.find(p=>p.id===active).name}`;$('#targetChecks').replaceChildren(...Object.keys(names).map(p=>{const label=el('label'),check=el('input');check.type='checkbox';check.value=p;check.checked=!!account(p).confirmed;check.disabled=!account(p).confirmed;label.append(check,document.createTextNode(names[p]));return label;}));$('#audienceConfirmed').checked=false;$('#scheduleHint').textContent=`Your timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}. Batch order follows the library order.`;$('#scheduleDialog').showModal(); $('#scheduleForm button[type=submit]').disabled=!Object.keys(names).some(p=>account(p).confirmed); if(!Object.keys(names).some(p=>account(p).confirmed)) $('#scheduleHint').textContent='Connect an account in the Accounts tab before posting.';};
-$('#when').onchange=()=>{$('#dateLabel').hidden=$('#when').value!=='later';$('#date').required=$('#when').value==='later';};
-$('#scheduleForm').onsubmit=guard(async e=>{e.preventDefault();const later=$('#when').value==='later';const start=later?new Date($('#date').value).getTime():null;if(later&&(!Number.isFinite(start)||start<=Date.now()))throw Error('Choose a time in the future.');await api('/api/queue',{ids:videos().filter(v=>selected.has(v.id)).map(v=>v.id),platforms:[...$('#targetChecks').querySelectorAll('input:checked')].map(i=>i.value),start,interval:Number($('#interval').value),audienceConfirmed:$('#audienceConfirmed').checked});$('#scheduleDialog').close();selected.clear();await refresh();setView('queue');toast('Added to your publishing queue.');});
+$('#schedule').onclick=()=>{
+  $('#interval').closest('label').hidden=selected.size<2;
+  $('#when').value='now';$('#interval').value='0';$('#dateLabel').hidden=true;$('#date').required=false;
+  $('#scheduleSummary').textContent=`${selected.size} video${selected.size===1?'':'s'} � ${state.profiles.find(p=>p.id===active).name}`;
+  $('#targetChecks').replaceChildren(...Object.keys(names).map(p=>{
+    const label=el('label'),check=el('input');check.type='checkbox';check.value=p;
+    const alreadyQueued=profileJobs().some(j=>selected.has(j.video)&&j.platform===p&&j.state!=='cancelled');
+    check.disabled=!account(p).confirmed||alreadyQueued;check.checked=!check.disabled;
+    label.title=alreadyQueued?'One or more selected videos already have an upload here.':account(p).confirmed?account(p).label:'Connect this account first.';
+    label.append(check,document.createTextNode(names[p]));check.onchange=schedulePreview;return label;
+  }));
+  $('#audienceConfirmed').checked=false;$('#scheduleDialog').showModal();schedulePreview();
+};
+function schedulePreview(){
+  const later=$('#when').value==='later',targets=[...document.querySelectorAll('#targetChecks input:checked')];
+  $('#dateLabel').hidden=!later;$('#date').required=later;
+  const submit=$('#scheduleForm button[type=submit]');submit.disabled=!targets.length;
+  submit.textContent=state.paused?'Add to paused queue':later?'Schedule videos':'Publish now';
+  const interval=selected.size>1?Number($('#interval').value):0;
+  $('#scheduleHint').textContent=!targets.length?'Select an available account. Already queued destinations are disabled.':
+    `${selected.size} video${selected.size===1?'':'s'} to ${targets.map(i=>names[i.value]).join(', ')}. `+
+    (interval?`First video ${later?'at your chosen time':'now'}, then one every ${interval/3600000} hours. `:'All selected videos will upload one after another. ')+
+    `Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}. Keep this computer awake and online.`;
+}
+$('#when').onchange=()=>{if($('#when').value==='later'&&selected.size>1&&$('#interval').value==='0')$('#interval').value='86400000';schedulePreview();};
+$('#interval').onchange=schedulePreview;
+$('#scheduleForm').onsubmit=guard(async e=>{
+  e.preventDefault();const b=$('#scheduleForm button[type=submit]');if(b.disabled)return;b.disabled=true;
+  try{
+    const later=$('#when').value==='later',start=later?new Date($('#date').value).getTime():null;
+    if(later&&(!Number.isFinite(start)||start<=Date.now()))throw Error('Choose a time in the future.');
+    await api('/api/queue',{ids:videos().filter(v=>selected.has(v.id)).map(v=>v.id),platforms:[...document.querySelectorAll('#targetChecks input:checked')].map(i=>i.value),start,interval:selected.size>1?Number($('#interval').value):0,audienceConfirmed:$('#audienceConfirmed').checked});
+    $('#scheduleDialog').close();selected.clear();await refresh();setView('queue');toast(state.paused?'Videos queued. Press Resume when you are ready.':'Added to your publishing queue.');
+  }finally{b.disabled=false;}
+});
 function disconnected(){if(!stopped)$('#connectionAlert').hidden=false;} refresh().catch(disconnected);setInterval(()=>{if(!stopped)refresh().catch(disconnected);},5000);
